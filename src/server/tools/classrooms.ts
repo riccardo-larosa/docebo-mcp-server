@@ -19,10 +19,10 @@ export const classroomsToolsMap: Map<string, McpToolDefinition> = new Map([
   ["get-a-classroom", {
     name: "get-a-classroom",
     description: `Get a Classroom`,
-    inputSchema: { "type": "object", "properties": { "classroomID": { "type": "string", "description": "The unique identifier for a classroom." } }, "required": ["classroomID"] },
+    inputSchema: { "type": "object", "properties": { "id": { "type": "string", "description": "The unique identifier for a classroom." } }, "required": ["id"] },
     method: "get",
-    pathTemplate: "learn/v1/classroom/{classroomID}",
-    executionParameters: [{ "name": "courseID", "in": "path" }],
+    pathTemplate: "learn/v1/classroom/{id}",
+    executionParameters: [{ "name": "id", "in": "path" }],
     requestBodyContentType: undefined,
     securityRequirements: [{ "bearerAuth": [] }]
   }]

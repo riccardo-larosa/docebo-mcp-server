@@ -19,10 +19,10 @@ export const coursesToolsMap: Map<string, McpToolDefinition> = new Map([
   ["get-a-course", {
     name: "get-a-course",
     description: `Get a Course`,
-    inputSchema: { "type": "object", "properties": { "courseID": { "type": "string", "description": "The unique identifier for a course." } }, "required": ["courseID"] },
+    inputSchema: { "type": "object", "properties": { "course_id": { "type": "string", "description": "The unique identifier for a course." } }, "required": ["course_id"] },
     method: "get",
-    pathTemplate: "learn/v1/courses/{courseID}",
-    executionParameters: [{ "name": "courseID", "in": "path" }],
+    pathTemplate: "learn/v1/courses/{course_id}",
+    executionParameters: [{ "name": "course_id", "in": "path" }],
     requestBodyContentType: undefined,
     securityRequirements: [{ "bearerAuth": [] }]
   }]
