@@ -1,6 +1,6 @@
 # MCP Streamable HTTP Server Example
 
-This directory contains an example implementation of a Model Context Protocol (MCP) server using the `@modelcontextprotocol/sdk` and Express.js.
+This directory contains an example implementation of a Model Context Protocol (MCP) server using the `@modelcontextprotocol/sdk`.
 
 It utilizes the `StreamableHTTPServerTransport` to handle MCP communication over HTTP, supporting bidirectional communication including server-sent events (SSE) for notifications.
 
@@ -13,7 +13,7 @@ It also includes the `simpleStreamableHttpClient.ts` to start a client and inter
 *   Manages client sessions using the `mcp-session-id` header.
 *   Handles client requests (POST), server notifications (GET via SSE), and session termination (DELETE).
 *   Includes a basic example tool (`echo`).
-*   Built with TypeScript and Express.js.
+*   Built with TypeScript and hono server.
 
 ## Prerequisites
 
