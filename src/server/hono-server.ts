@@ -9,7 +9,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { InitializeRequestSchema, JSONRPCError } from "@modelcontextprotocol/sdk/types.js";
 import { toReqRes, toFetchResponse } from 'fetch-to-node';
-// import { validateBearerToken, getBearerToken } from "./auth.js";
+
 
 // Import server configuration constants
 import { SERVER_NAME, SERVER_VERSION } from './hono-index.js';

@@ -104,3 +104,51 @@ Add the server configuration to your Claude Desktop config file (usually located
   }
 }
 ```
+
+Remote MCP Server are still being developed/enhanced by different MCP Hosts like Claude Desktop.
+
+MCP servers can be deployed in 2 different ways:
+1. Local MCP Server with Remote API
+
+```mermaid
+graph LR
+    subgraph "Your Computer"
+        C1[MCP Host w/ Client]
+        S1[MCP Server]
+    end
+    
+    subgraph "Remote Servers"
+        API1[Remote API]
+    end
+    
+    C1 <--> S1
+    S1 <--> API1
+
+  style C1 fill:#2e7d32,color:#ffffff
+  style S1 fill:#f57c00,color:#ffffff
+  style API1 fill:#c2185b,color:#ffffff
+
+```
+
+2. Local Host/Client connecting to Remote MCP Server
+```mermaid
+graph LR
+    subgraph "Your Computer "
+        C2[MCP Host w/ Client]
+    end
+    
+    subgraph "Remote Server"
+        S2[MCP Server]
+        API2[Remote API]
+    end
+    
+    C2 <-.-> S2
+    S2 <--> API2
+
+  style C2 fill:#2e7d32,color:#ffffff
+  style S2 fill:#f57c00,color:#ffffff
+  style API2 fill:#c2185b,color:#ffffff
+
+```
+
+These have created confusion about 

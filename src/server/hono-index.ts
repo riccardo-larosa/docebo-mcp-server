@@ -16,7 +16,6 @@ import { McpToolDefinition } from "./tools/index.js";
 import { coursesToolsMap } from './tools/courses.js';
 import { classroomsToolsMap } from './tools/classrooms.js';
 
-// import { getBearerToken } from "./auth.js";
 
 import dotenv from 'dotenv';
 
@@ -33,7 +32,7 @@ type JsonObject = Record<string, any>;
  */
 export const SERVER_NAME = "docebo-mcp-server";
 export const SERVER_VERSION = "0.1.0";
-export const API_BASE_URL = "https://riccardo-lr-test.docebosaas.com/";
+export const API_BASE_URL = process.env.API_BASE_URL;
 
 /**
  * MCP Server instance
