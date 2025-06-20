@@ -151,4 +151,8 @@ graph LR
 
 ```
 
-These have created confusion about 
+There are 2 forms of authorization: 
+1. MCP protocol provides authorization capabilities at the transport level, enabling MCP clients to make requests to restricted MCP servers on behalf of resource owners. This is what the new Authorization proposal addresses. 
+2. The MCP Server needs to know how to authenticate with the remote APIs as well.
+
+This application needs a bearer token that is then passed from the MCP Client to the MCP Server and the MCP Server uses this to call the remote APIs. This system is not ideal if the MCP Server have to deal with more than one remote API system.

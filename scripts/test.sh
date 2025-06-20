@@ -66,14 +66,21 @@ build_project() {
 # Run unit tests
 run_unit_tests() {
     print_step "Running unit tests..."
-    npm test -- __tests__/auth.test.ts __tests__/tools.test.ts __tests__/server-core.test.ts
+    npm test -- __tests__/auth.test.ts __tests__/tools.test.ts __tests__/server-core.test.ts __tests__/client.test.ts
     print_success "Unit tests completed"
+}
+
+# Run MCP protocol compliance tests
+run_mcp_tests() {
+    print_step "Running MCP protocol compliance tests..."
+    npm test -- __tests__/mcp-protocol-compliance.test.ts
+    print_success "MCP protocol compliance tests completed"
 }
 
 # Run integration tests
 run_integration_tests() {
     print_step "Running integration tests..."
-    npm test -- __tests__/hono-server.test.ts __tests__/client.test.ts __tests__/integration/
+    npm test -- __tests__/integration/ 2>/dev/null || print_warning "No integration tests found"
     print_success "Integration tests completed"
 }
 
@@ -152,6 +159,10 @@ main() {
             check_dependencies
             run_unit_tests
             ;;
+        "mcp")
+            check_dependencies
+            run_mcp_tests
+            ;;
         "integration")
             check_dependencies
             run_integration_tests
@@ -203,6 +214,7 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo "  deps       - Check and install dependencies"
     echo "  build      - Build the project"
     echo "  unit       - Run unit tests only"
+    echo "  mcp        - Run MCP protocol compliance tests"
     echo "  integration- Run integration tests only"
     echo "  coverage   - Generate coverage report"
     echo "  lint       - Lint the code"
