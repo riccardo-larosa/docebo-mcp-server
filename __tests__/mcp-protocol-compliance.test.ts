@@ -10,23 +10,16 @@ import { z } from 'zod';
 describe('MCP Protocol Compliance Tests', () => {
   let app: express.Application;
   let server: Server;
-  let mcpServer: McpServer;
   let client: Client;
   let serverUrl: string;
   const port = 3001;
 
-  beforeAll(async () => {
-    // Setup Express server with MCP server
-    app = express();
-    app.use(express.json());
-
-    // Create MCP server instance
-    mcpServer = new McpServer({
+  function createMcpServer(): McpServer {
+    const mcpServer = new McpServer({
       name: 'test-docebo-server',
       version: '1.0.0'
     });
 
-    // Register test tools following our actual implementation
     mcpServer.registerTool(
       'getCourses',
       {
@@ -74,6 +67,26 @@ describe('MCP Protocol Compliance Tests', () => {
       })
     );
 
+    mcpServer.registerTool(
+      'errorTool',
+      {
+        title: 'Error Tool',
+        description: 'Tool that throws errors',
+        inputSchema: {}
+      },
+      async () => {
+        throw new Error('Test error');
+      }
+    );
+
+    return mcpServer;
+  }
+
+  beforeAll(async () => {
+    // Setup Express server with MCP server
+    app = express();
+    app.use(express.json());
+
     // Setup HTTP transport and endpoints
     const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 
@@ -98,6 +111,8 @@ describe('MCP Protocol Compliance Tests', () => {
             }
           };
 
+          // Create a new McpServer instance per transport (SDK requires one server per transport)
+          const mcpServer = createMcpServer();
           await mcpServer.connect(transport);
         }
 
@@ -268,23 +283,15 @@ describe('MCP Protocol Compliance Tests', () => {
     });
 
     it('should handle requests with invalid parameters', async () => {
-      try {
-        await client.request(
-          { 
-            method: 'tools/call',
-            params: {
-              name: 'getCourses',
-              arguments: {
-                page: 'invalid-number' // Should be number
-              }
-            }
-          },
-          z.any()
-        );
-        expect.fail('Should have thrown an error');
-      } catch (error: any) {
-        expect(error.message).toContain('Invalid arguments');
-      }
+      const result = await client.callTool({
+        name: 'getCourses',
+        arguments: {
+          page: 'invalid-number' // Should be number
+        }
+      });
+
+      // The SDK returns errors in the result with isError flag
+      expect((result as any).isError).toBe(true);
     });
   });
 
@@ -329,24 +336,26 @@ describe('MCP Protocol Compliance Tests', () => {
     });
 
     it('should validate tool parameters according to schema', async () => {
-      await expect(async () => {
-        await client.callTool({
-          name: 'getCourses',
-          arguments: {
-            page: -1, // Invalid: should be positive
-            pageSize: 'invalid' // Invalid: should be number
-          }
-        });
-      }).rejects.toThrow();
+      const result = await client.callTool({
+        name: 'getCourses',
+        arguments: {
+          page: -1, // Invalid: should be positive
+          pageSize: 'invalid' // Invalid: should be number
+        }
+      });
+
+      // The SDK returns validation errors in the result with isError flag
+      expect((result as any).isError).toBe(true);
     });
 
     it('should handle non-existent tool calls', async () => {
-      await expect(async () => {
-        await client.callTool({
-          name: 'nonExistentTool',
-          arguments: {}
-        });
-      }).rejects.toThrow();
+      const result = await client.callTool({
+        name: 'nonExistentTool',
+        arguments: {}
+      });
+
+      // The SDK returns errors for non-existent tools in the result
+      expect((result as any).isError).toBe(true);
     });
 
     it('should apply default values for optional parameters', async () => {
@@ -372,33 +381,16 @@ describe('MCP Protocol Compliance Tests', () => {
         expect(error.code).toBe(-32601); // Method not found
       }
 
-      // Test invalid params
-      try {
-        await client.callTool({
-          name: 'getCourses',
-          arguments: { page: 'not-a-number' }
-        });
-        expect.fail('Should have thrown');
-      } catch (error: any) {
-        expect(error.code).toBe(-32602); // Invalid params
-      }
+      // Test invalid params - SDK now returns errors in result instead of throwing
+      const result = await client.callTool({
+        name: 'getCourses',
+        arguments: { page: 'not-a-number' }
+      });
+      expect((result as any).isError).toBe(true);
     });
 
     it('should handle server errors gracefully', async () => {
-      // Create a tool that throws an error
-      mcpServer.registerTool(
-        'errorTool',
-        {
-          title: 'Error Tool',
-          description: 'Tool that throws errors',
-          inputSchema: {}
-        },
-        async () => {
-          throw new Error('Test error');
-        }
-      );
-
-      // Test that the error is properly handled and propagated
+      // errorTool is registered in createMcpServer and throws an error
       try {
         const result = await client.callTool({
           name: 'errorTool',

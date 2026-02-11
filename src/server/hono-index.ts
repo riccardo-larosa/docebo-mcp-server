@@ -121,10 +121,10 @@ async function executeApiTool(
     try {
       const zodSchema = getZodSchemaFromJsonSchema(definition.inputSchema, toolName);
       const argsToParse = (typeof toolArgs === 'object' && toolArgs !== null) ? toolArgs : {};
-      validatedArgs = zodSchema.parse(argsToParse);
+      validatedArgs = zodSchema.parse(argsToParse) as JsonObject;
     } catch (error: unknown) {
       if (error instanceof ZodError) {
-        const validationErrorMessage = `Invalid arguments for tool '${toolName}': ${error.errors.map(e => `${e.path.join('.')} (${e.code}): ${e.message}`).join(', ')}`;
+        const validationErrorMessage = `Invalid arguments for tool '${toolName}': ${error.issues.map((e) => `${e.path.join('.')} (${e.code}): ${e.message}`).join(', ')}`;
         return { content: [{ type: 'text', text: validationErrorMessage }] };
       } else {
         const errorMessage = error instanceof Error ? error.message : String(error);

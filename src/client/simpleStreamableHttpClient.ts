@@ -428,7 +428,8 @@ async function getPrompt(name: string, args: Record<string, unknown>): Promise<v
     const promptResult = await client.request(promptRequest, GetPromptResultSchema);
     console.log('Prompt template:');
     promptResult.messages.forEach((msg, index) => {
-      console.log(`  [${index + 1}] ${msg.role}: ${msg.content.text}`);
+      const text = typeof msg.content === 'string' ? msg.content : ('text' in msg.content ? msg.content.text : JSON.stringify(msg.content));
+      console.log(`  [${index + 1}] ${msg.role}: ${text}`);
     });
   } catch (error) {
     console.log(`Error getting prompt ${name}: ${error}`);
