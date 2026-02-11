@@ -8,7 +8,8 @@
     "coverage": "vitest run --coverage",
     "start:simpleClient": "node build/client/simpleStreamableHttpClient.js",
     "build": "tsc -b",
-    "dev:hono": "tsc-watch --onSuccess \"node build/server/hono-index.js\""
+    "dev:hono": "tsc-watch --onSuccess \"node build/server/hono-index.js\"",
+    "start:stdio": "node build/server/stdio-index.js"
   },
   "keywords": [],
   "author": "Riccardo La Rosa <rlarosa@gmail.com>",
