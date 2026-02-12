@@ -97,7 +97,7 @@ export function createServer(options?: CreateServerOptions): Server {
       console.error(`Error: Unknown tool requested: ${toolName}`);
       return { content: [{ type: "text", text: `Error: Unknown tool requested: ${toolName}` }] };
     }
-    console.log(`Executing tool "${toolName}" with arguments ${JSON.stringify(toolArgs)} and securitySchemes ${JSON.stringify(securitySchemes)}`);
+    console.error(`Executing tool "${toolName}" with arguments ${JSON.stringify(toolArgs)} and securitySchemes ${JSON.stringify(securitySchemes)}`);
 
     // If a dynamic token provider is configured, resolve the token and set it in env
     if (options?.getAccessToken) {
@@ -169,7 +169,10 @@ async function executeApiTool(
     }
 
     // Construct the full URL
-    const requestUrl = apiBaseUrl ? `${apiBaseUrl}${urlPath}` : urlPath;
+    // Ensure a single slash separates base URL and path
+    const base = apiBaseUrl?.replace(/\/+$/, '') ?? '';
+    const pathPart = urlPath.replace(/^\/+/, '');
+    const requestUrl = base ? `${base}/${pathPart}` : urlPath;
 
     // Handle request body if needed
     if (definition.requestBodyContentType && typeof validatedArgs['requestBody'] !== 'undefined') {

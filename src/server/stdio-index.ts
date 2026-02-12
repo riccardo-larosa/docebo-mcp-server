@@ -2,27 +2,28 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { createServer } from "./core.js";
 import { getAccessToken } from "./oauth.js";
 
-import dotenv from 'dotenv';
-
-dotenv.config();
+// No dotenv here — env vars are provided by Claude Desktop config.
+// dotenv writes to stdout which breaks the stdio JSON-RPC protocol.
 
 async function main() {
   const apiBaseUrl = process.env.API_BASE_URL;
   const clientId = process.env.DOCEBO_CLIENT_ID;
   const clientSecret = process.env.DOCEBO_CLIENT_SECRET;
+  const username = process.env.DOCEBO_USERNAME;
+  const password = process.env.DOCEBO_PASSWORD;
 
-  if (!apiBaseUrl || !clientId || !clientSecret) {
-    console.error("Missing required environment variables: API_BASE_URL, DOCEBO_CLIENT_ID, DOCEBO_CLIENT_SECRET");
+  if (!apiBaseUrl || !clientId || !clientSecret || !username || !password) {
+    console.error("Missing required environment variables: API_BASE_URL, DOCEBO_CLIENT_ID, DOCEBO_CLIENT_SECRET, DOCEBO_USERNAME, DOCEBO_PASSWORD");
     process.exit(1);
   }
 
-  // Obtain (or load cached) access token via OAuth
-  const accessToken = await getAccessToken(apiBaseUrl, clientId, clientSecret);
+  // Obtain (or load cached) access token via OAuth password grant
+  const accessToken = await getAccessToken(apiBaseUrl, clientId, clientSecret, username, password);
   process.env.BEARER_TOKEN_BEARERAUTH = accessToken;
 
   // Create the MCP server with a dynamic token provider for refresh
   const server = createServer({
-    getAccessToken: () => getAccessToken(apiBaseUrl, clientId, clientSecret),
+    getAccessToken: () => getAccessToken(apiBaseUrl, clientId, clientSecret, username, password),
   });
 
   // Connect to stdio transport

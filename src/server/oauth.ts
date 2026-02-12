@@ -1,8 +1,6 @@
-import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { exec } from 'node:child_process';
 import axios from 'axios';
 
 /**
@@ -46,102 +44,56 @@ function saveCachedToken(accessToken: string, expiresIn: number): void {
 }
 
 /**
- * Open a URL in the user's default browser (cross-platform).
+ * Obtain an access token using the OAuth2 resource owner password grant.
+ * POST {apiBaseUrl}/oauth2/token with grant_type=password.
  */
-function openBrowser(url: string): void {
-  const platform = process.platform;
-  const cmd = platform === 'darwin' ? 'open'
-    : platform === 'win32' ? 'start'
-    : 'xdg-open';
-  exec(`${cmd} "${url}"`);
-}
+async function obtainToken(
+  apiBaseUrl: string,
+  clientId: string,
+  clientSecret: string,
+  username: string,
+  password: string
+): Promise<string> {
+  const tokenResponse = await axios.post(
+    `${apiBaseUrl}/oauth2/token`,
+    new URLSearchParams({
+      grant_type: 'password',
+      client_id: clientId,
+      client_secret: clientSecret,
+      username,
+      password,
+      scope: 'api',
+    }).toString(),
+    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+  );
 
-/**
- * Run the OAuth2 authorization code flow:
- * 1. Start a temporary local HTTP server on a random port
- * 2. Open the browser to the Docebo authorize endpoint
- * 3. Wait for the redirect callback with the authorization code
- * 4. Exchange the code for an access token
- * 5. Cache the token to disk
- */
-async function obtainToken(apiBaseUrl: string, clientId: string, clientSecret: string): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    const callbackServer = http.createServer(async (req, res) => {
-      try {
-        const url = new URL(req.url!, `http://localhost`);
-        if (url.pathname !== '/callback') {
-          res.writeHead(404);
-          res.end('Not found');
-          return;
-        }
+  const { access_token, expires_in } = tokenResponse.data;
+  if (!access_token) {
+    throw new Error('Token response did not contain an access_token');
+  }
 
-        const code = url.searchParams.get('code');
-        if (!code) {
-          res.writeHead(400);
-          res.end('Missing authorization code');
-          reject(new Error('No authorization code received in callback'));
-          callbackServer.close();
-          return;
-        }
-
-        // Exchange code for token
-        const redirectUri = `http://localhost:${(callbackServer.address() as any).port}/callback`;
-        const tokenResponse = await axios.post(`${apiBaseUrl}/oauth2/token`, new URLSearchParams({
-          grant_type: 'authorization_code',
-          client_id: clientId,
-          client_secret: clientSecret,
-          code,
-          redirect_uri: redirectUri,
-        }).toString(), {
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        });
-
-        const { access_token, expires_in } = tokenResponse.data;
-        saveCachedToken(access_token, expires_in ?? 3600);
-
-        res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end('<html><body><h2>Authorization successful!</h2><p>You can close this tab and return to your terminal.</p></body></html>');
-
-        callbackServer.close();
-        resolve(access_token);
-      } catch (err: any) {
-        res.writeHead(500);
-        res.end('Token exchange failed');
-        callbackServer.close();
-        reject(err);
-      }
-    });
-
-    // Listen on a random available port
-    callbackServer.listen(0, () => {
-      const port = (callbackServer.address() as any).port;
-      const redirectUri = encodeURIComponent(`http://localhost:${port}/callback`);
-      const authorizeUrl = `${apiBaseUrl}/oauth2/authorize?client_id=${encodeURIComponent(clientId)}&response_type=code&redirect_uri=${redirectUri}`;
-
-      console.error(`Opening browser for Docebo authorization...`);
-      console.error(`If the browser doesn't open, visit: ${authorizeUrl}`);
-      openBrowser(authorizeUrl);
-    });
-
-    // Timeout after 2 minutes
-    setTimeout(() => {
-      callbackServer.close();
-      reject(new Error('Authorization timed out after 2 minutes'));
-    }, 120_000);
-  });
+  saveCachedToken(access_token, expires_in ?? 3600);
+  console.error('Obtained new Docebo access token via password grant.');
+  return access_token;
 }
 
 /**
  * Get a valid access token, using the disk cache if available,
- * otherwise running the full OAuth authorization code flow.
+ * otherwise requesting a new one via password grant.
  */
-export async function getAccessToken(apiBaseUrl: string, clientId: string, clientSecret: string): Promise<string> {
+export async function getAccessToken(
+  apiBaseUrl: string,
+  clientId: string,
+  clientSecret: string,
+  username: string,
+  password: string
+): Promise<string> {
   const cached = loadCachedToken();
   if (cached) {
     console.error('Using cached Docebo access token.');
     return cached;
   }
 
-  console.error('No valid cached token found. Starting OAuth authorization flow...');
-  return obtainToken(apiBaseUrl, clientId, clientSecret);
+  console.error('No valid cached token. Requesting new token via password grant...');
+  return obtainToken(apiBaseUrl, clientId, clientSecret, username, password);
 }
