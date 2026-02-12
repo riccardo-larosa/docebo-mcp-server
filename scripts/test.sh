@@ -167,6 +167,12 @@ main() {
             check_dependencies
             run_integration_tests
             ;;
+        "contract")
+            check_dependencies
+            print_step "Running API contract tests..."
+            npm run test:contract
+            print_success "API contract tests completed"
+            ;;
         "coverage")
             check_dependencies
             generate_coverage
@@ -216,6 +222,7 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo "  unit       - Run unit tests only"
     echo "  mcp        - Run MCP protocol compliance tests"
     echo "  integration- Run integration tests only"
+    echo "  contract   - Run API contract/smoke tests (needs API_BASE_URL + token)"
     echo "  coverage   - Generate coverage report"
     echo "  lint       - Lint the code"
     echo "  typecheck  - Run TypeScript type checking"
