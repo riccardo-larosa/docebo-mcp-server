@@ -453,4 +453,274 @@ describe('Server Core — CallTool handler', () => {
 
     expect(result.isError).toBeUndefined();
   });
+
+  it('should execute list-enrollments and return API response', async () => {
+    mockAxios.mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      data: { data: { items: [{ id: 1, user_id: 10, course_id: 20, status: 'completed' }] } },
+    });
+
+    const result = await callToolHandler({
+      params: { name: 'list-enrollments', arguments: { user_id: '10' } },
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(result.content[0].text).toContain('API Response (Status: 200)');
+    expect(result.content[0].text).toContain('completed');
+
+    const axiosCall = mockAxios.mock.calls[0][0];
+    expect(axiosCall.url).toContain('/learn/v1/enrollments');
+    expect(axiosCall.params.user_id).toBe('10');
+  });
+
+  it('should execute list-users and return API response', async () => {
+    mockAxios.mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      data: { data: { items: [{ user_id: 1, username: 'jdoe', email: 'jdoe@example.com' }] } },
+    });
+
+    const result = await callToolHandler({
+      params: { name: 'list-users', arguments: { search_text: 'jdoe' } },
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(result.content[0].text).toContain('API Response (Status: 200)');
+    expect(result.content[0].text).toContain('jdoe');
+
+    const axiosCall = mockAxios.mock.calls[0][0];
+    expect(axiosCall.url).toContain('/manage/v1/user');
+    expect(axiosCall.params.search_text).toBe('jdoe');
+  });
+
+  it('should resolve path parameters for get-user', async () => {
+    mockAxios.mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      data: { data: { user_id: 42, username: 'test-user' } },
+    });
+
+    const result = await callToolHandler({
+      params: { name: 'get-user', arguments: { user_id: '42' } },
+    });
+
+    expect(result.isError).toBeUndefined();
+
+    const axiosCall = mockAxios.mock.calls[0][0];
+    expect(axiosCall.url).toContain('/manage/v1/user/42');
+    expect(axiosCall.url).not.toContain('{user_id}');
+  });
+});
+
+describe('Server Core — New tools in ListTools', () => {
+  let listToolsHandler: Function;
+
+  beforeEach(() => {
+    registeredHandlers.clear();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    createServer();
+    listToolsHandler = registeredHandlers.get(ListToolsRequestSchema)!;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should include enrollment tools in ListTools response', async () => {
+    const result = await listToolsHandler();
+    const toolNames = result.tools.map((t: any) => t.name);
+    expect(toolNames).toContain('list-enrollments');
+    expect(toolNames).toContain('get-enrollment-details');
+  });
+
+  it('should include user tools in ListTools response', async () => {
+    const result = await listToolsHandler();
+    const toolNames = result.tools.map((t: any) => t.name);
+    expect(toolNames).toContain('list-users');
+    expect(toolNames).toContain('get-user');
+  });
+});
+
+describe('Server Core — team-training-status prompt', () => {
+  let listPromptsHandler: Function;
+  let getPromptHandler: Function;
+
+  beforeEach(() => {
+    registeredHandlers.clear();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    createServer();
+    listPromptsHandler = registeredHandlers.get(ListPromptsRequestSchema)!;
+    getPromptHandler = registeredHandlers.get(GetPromptRequestSchema)!;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should include team-training-status in ListPrompts', async () => {
+    const result = await listPromptsHandler();
+    const promptNames = result.prompts.map((p: any) => p.name);
+    expect(promptNames).toContain('team-training-status');
+  });
+
+  it('should return messages for team-training-status without arguments', async () => {
+    const result = await getPromptHandler({ params: { name: 'team-training-status', arguments: {} } });
+    expect(result.messages).toBeDefined();
+    expect(result.messages.length).toBe(1);
+    expect(result.messages[0].role).toBe('user');
+    expect(result.messages[0].content.text).toContain('list-users');
+    expect(result.messages[0].content.text).toContain('list-enrollments');
+    expect(result.messages[0].content.text).toContain('Include all team members');
+    expect(result.messages[0].content.text).toContain('Include all assigned trainings');
+  });
+
+  it('should filter by training_name when provided', async () => {
+    const result = await getPromptHandler({ params: { name: 'team-training-status', arguments: { training_name: 'Compliance' } } });
+    expect(result.messages[0].content.text).toContain('Compliance');
+    expect(result.messages[0].content.text).toContain('list-all-courses');
+  });
+
+  it('should filter by team_member when provided', async () => {
+    const result = await getPromptHandler({ params: { name: 'team-training-status', arguments: { team_member: 'Jane Doe' } } });
+    expect(result.messages[0].content.text).toContain('Jane Doe');
+  });
+});
+
+describe('Server Core — course-recommendations prompt', () => {
+  let listPromptsHandler: Function;
+  let getPromptHandler: Function;
+
+  beforeEach(() => {
+    registeredHandlers.clear();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    createServer();
+    listPromptsHandler = registeredHandlers.get(ListPromptsRequestSchema)!;
+    getPromptHandler = registeredHandlers.get(GetPromptRequestSchema)!;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should include course-recommendations in ListPrompts', async () => {
+    const result = await listPromptsHandler();
+    const promptNames = result.prompts.map((p: any) => p.name);
+    expect(promptNames).toContain('course-recommendations');
+  });
+
+  it('should return messages for course-recommendations without arguments', async () => {
+    const result = await getPromptHandler({ params: { name: 'course-recommendations', arguments: {} } });
+    expect(result.messages).toBeDefined();
+    expect(result.messages.length).toBe(1);
+    expect(result.messages[0].role).toBe('user');
+    expect(result.messages[0].content.text).toContain('list-users');
+    expect(result.messages[0].content.text).toContain('list-enrollments');
+    expect(result.messages[0].content.text).toContain('list-all-courses');
+    expect(result.messages[0].content.text).toContain('Ask the user');
+  });
+
+  it('should include user_name in prompt when provided', async () => {
+    const result = await getPromptHandler({ params: { name: 'course-recommendations', arguments: { user_name: 'John Smith' } } });
+    expect(result.messages[0].content.text).toContain('John Smith');
+    expect(result.messages[0].content.text).toContain('list-users');
+    expect(result.messages[0].content.text).not.toContain('Ask the user');
+  });
+
+  it('should include interest_area in prompt when provided', async () => {
+    const result = await getPromptHandler({ params: { name: 'course-recommendations', arguments: { interest_area: 'leadership' } } });
+    expect(result.messages[0].content.text).toContain('leadership');
+    expect(result.messages[0].content.text).toContain('search_text="leadership"');
+  });
+
+  it('should include both arguments when provided', async () => {
+    const result = await getPromptHandler({ params: { name: 'course-recommendations', arguments: { user_name: 'Jane Doe', interest_area: 'data science' } } });
+    expect(result.messages[0].content.text).toContain('Jane Doe');
+    expect(result.messages[0].content.text).toContain('data science');
+  });
+});
+
+describe('Server Core — list-all-courses search params', () => {
+  let callToolHandler: Function;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    registeredHandlers.clear();
+    process.env.BEARER_TOKEN_BEARERAUTH = 'test-token-123';
+    process.env.API_BASE_URL = 'https://example.docebosaas.com';
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    createServer();
+    callToolHandler = registeredHandlers.get(CallToolRequestSchema)!;
+  });
+
+  afterEach(() => {
+    delete process.env.BEARER_TOKEN_BEARERAUTH;
+    delete process.env.API_BASE_URL;
+    vi.restoreAllMocks();
+  });
+
+  it('should pass search_text as query param to axios', async () => {
+    mockAxios.mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      data: { data: { items: [] } },
+    });
+
+    await callToolHandler({
+      params: { name: 'list-all-courses', arguments: { search_text: 'compliance' } },
+    });
+
+    const axiosCall = mockAxios.mock.calls[0][0];
+    expect(axiosCall.params.search_text).toBe('compliance');
+  });
+
+  it('should pass category and status as query params to axios', async () => {
+    mockAxios.mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      data: { data: { items: [] } },
+    });
+
+    await callToolHandler({
+      params: { name: 'list-all-courses', arguments: { category: 'Safety', status: 'published' } },
+    });
+
+    const axiosCall = mockAxios.mock.calls[0][0];
+    expect(axiosCall.params.category).toBe('Safety');
+    expect(axiosCall.params.status).toBe('published');
+  });
+
+  it('should pass sort_by and sort_order as query params to axios', async () => {
+    mockAxios.mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      data: { data: { items: [] } },
+    });
+
+    await callToolHandler({
+      params: { name: 'list-all-courses', arguments: { sort_by: 'name', sort_order: 'asc' } },
+    });
+
+    const axiosCall = mockAxios.mock.calls[0][0];
+    expect(axiosCall.params.sort_by).toBe('name');
+    expect(axiosCall.params.sort_order).toBe('asc');
+  });
+
+  it('should not include undefined search params in query', async () => {
+    mockAxios.mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      data: { data: { items: [] } },
+    });
+
+    await callToolHandler({
+      params: { name: 'list-all-courses', arguments: { page: '0' } },
+    });
+
+    const axiosCall = mockAxios.mock.calls[0][0];
+    expect(axiosCall.params.page).toBe('0');
+    expect(axiosCall.params).not.toHaveProperty('search_text');
+    expect(axiosCall.params).not.toHaveProperty('category');
+  });
 });

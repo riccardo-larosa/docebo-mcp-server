@@ -15,9 +15,13 @@ import { McpToolDefinition } from "./tools/index.js";
 import { BaseTool } from "./tools/baseTool.js";
 import { coursesToolsMap } from './tools/courses.js';
 import { classroomsToolsMap } from './tools/classrooms.js';
+import { enrollmentsToolsMap } from './tools/enrollments.js';
+import { usersToolsMap } from './tools/users.js';
 import { getPrompts, getPromptMessages } from './prompts/index.js';
 import './prompts/courseEnrollmentReport.js';
 import './prompts/learnerProgress.js';
+import './prompts/teamTrainingStatus.js';
+import './prompts/courseRecommendations.js';
 
 /**
  * A tool entry can be either a declarative McpToolDefinition or a class-based BaseTool.
@@ -43,7 +47,8 @@ export const API_BASE_URL = process.env.API_BASE_URL;
 export const toolDefinitionMap: Map<string, ToolEntry> = new Map([
   ...coursesToolsMap,
   ...classroomsToolsMap,
-  // add more tools here
+  ...enrollmentsToolsMap,
+  ...usersToolsMap,
 ]);
 
 /**

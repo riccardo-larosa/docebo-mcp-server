@@ -4,6 +4,11 @@ import { McpToolDefinition } from "./index.js";
 const listCoursesSchema = z.object({
   page_size: z.string().optional().describe("The maximum number of records per page for this response."),
   page: z.string().optional().describe("The current offset by number of pages. Offset is zero-based."),
+  search_text: z.string().optional().describe("Search courses by name or description."),
+  category: z.string().optional().describe("Filter courses by category name."),
+  status: z.string().optional().describe("Filter courses by status (e.g., published, under_maintenance)."),
+  sort_by: z.string().optional().describe("Sort results by field (e.g., name, date_created)."),
+  sort_order: z.string().optional().describe("Sort order: asc or desc."),
 });
 
 const getCourseSchema = z.object({
@@ -18,14 +23,24 @@ export const coursesToolsMap: Map<string, McpToolDefinition> = new Map([
 Returns: Collection of courses with metadata (name, type, description, dates, category, enrollment policy) and pagination info.
 
 Usage Guidance:
-  - Use for browsing and exploring available courses.
+  - Use for browsing, searching, and exploring available courses.
+  - Use search_text to find courses by name or description keywords.
+  - Use category and status filters to narrow results.
   - Use get-a-course when you need full details for a specific course.
   - Supports pagination via page and page_size parameters.`,
     inputSchema: z.toJSONSchema(listCoursesSchema),
     zodSchema: listCoursesSchema,
     method: "get",
     pathTemplate: "learn/v1/courses",
-    executionParameters: [ { "name": "page", "in": "query" }, { "name": "page_size", "in": "query" }],
+    executionParameters: [
+      { "name": "page", "in": "query" },
+      { "name": "page_size", "in": "query" },
+      { "name": "search_text", "in": "query" },
+      { "name": "category", "in": "query" },
+      { "name": "status", "in": "query" },
+      { "name": "sort_by", "in": "query" },
+      { "name": "sort_order", "in": "query" },
+    ],
     requestBodyContentType: undefined,
     securityRequirements: [{ "bearerAuth": [] }],
     annotations: {

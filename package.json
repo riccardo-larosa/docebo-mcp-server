@@ -1,7 +1,7 @@
 {
   "name": "docebo-mcp-server",
-  "version": "0.1.0",
-  "description": "Docebo MCP server using StreamableHTTP",
+  "version": "0.2.0",
+  "description": "Docebo MCP server",
   "main": "index.js",
   "scripts": {
     "test": "vitest run",

@@ -53,8 +53,37 @@ describe('Tool Definitions', () => {
         expect(tool.pathTemplate).toBe('learn/v1/courses');
         expect(tool.inputSchema.properties).toHaveProperty('page_size');
         expect(tool.inputSchema.properties).toHaveProperty('page');
-        expect(tool.executionParameters).toHaveLength(2);
+        expect(tool.inputSchema.properties).toHaveProperty('search_text');
+        expect(tool.inputSchema.properties).toHaveProperty('category');
+        expect(tool.inputSchema.properties).toHaveProperty('status');
+        expect(tool.inputSchema.properties).toHaveProperty('sort_by');
+        expect(tool.inputSchema.properties).toHaveProperty('sort_order');
+        expect(tool.executionParameters).toHaveLength(7);
         expect(tool.securityRequirements).toEqual([{ 'bearerAuth': [] }]);
+      }
+    });
+
+    it('should accept search/filter params in list-all-courses zodSchema', () => {
+      const tool = coursesToolsMap.get('list-all-courses')!;
+      expect(() => tool.zodSchema!.parse({
+        search_text: 'compliance',
+        category: 'Safety',
+        status: 'published',
+        sort_by: 'name',
+        sort_order: 'asc',
+      })).not.toThrow();
+    });
+
+    it('should have search/filter executionParameters as query params', () => {
+      const tool = coursesToolsMap.get('list-all-courses')!;
+      const paramNames = tool.executionParameters.map(p => p.name);
+      expect(paramNames).toContain('search_text');
+      expect(paramNames).toContain('category');
+      expect(paramNames).toContain('status');
+      expect(paramNames).toContain('sort_by');
+      expect(paramNames).toContain('sort_order');
+      for (const param of tool.executionParameters) {
+        expect(param.in).toBe('query');
       }
     });
 
