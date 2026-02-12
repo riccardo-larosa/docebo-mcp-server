@@ -1,17 +1,28 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { z, ZodError } from 'zod';
-import { jsonSchemaToZod } from 'json-schema-to-zod';
 import axios, { type AxiosRequestConfig, type AxiosError } from 'axios';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
   type Tool,
   type CallToolResult,
-  type CallToolRequest
+  type CallToolRequest,
+  type GetPromptRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import { McpToolDefinition } from "./tools/index.js";
+import { BaseTool } from "./tools/baseTool.js";
 import { coursesToolsMap } from './tools/courses.js';
 import { classroomsToolsMap } from './tools/classrooms.js';
+import { getPrompts, getPromptMessages } from './prompts/index.js';
+import './prompts/courseEnrollmentReport.js';
+import './prompts/learnerProgress.js';
+
+/**
+ * A tool entry can be either a declarative McpToolDefinition or a class-based BaseTool.
+ */
+export type ToolEntry = McpToolDefinition | BaseTool;
 
 /**
  * Type definition for JSON objects
@@ -26,9 +37,10 @@ export const SERVER_VERSION = "0.1.0";
 export const API_BASE_URL = process.env.API_BASE_URL;
 
 /**
- * Combined tool definition map from all tool sources
+ * Combined tool entry map from all tool sources.
+ * Supports both declarative McpToolDefinition and class-based BaseTool instances.
  */
-export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
+export const toolDefinitionMap: Map<string, ToolEntry> = new Map([
   ...coursesToolsMap,
   ...classroomsToolsMap,
   // add more tools here
@@ -78,24 +90,51 @@ export interface CreateServerOptions {
 export function createServer(options?: CreateServerOptions): Server {
   const server = new Server(
     { name: SERVER_NAME, version: SERVER_VERSION },
-    { capabilities: { tools: {} } }
+    { capabilities: { tools: {}, prompts: {} } }
   );
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => {
-    const toolsForClient: Tool[] = Array.from(toolDefinitionMap.values()).map(def => ({
-      name: def.name,
-      description: def.description,
-      inputSchema: def.inputSchema
+  // --- Prompt handlers ---
+  server.setRequestHandler(ListPromptsRequestSchema, async () => {
+    const prompts = getPrompts().map(p => ({
+      name: p.name,
+      description: p.description,
+      arguments: p.arguments?.map(a => ({
+        name: a.name,
+        description: a.description,
+        required: a.required ?? false,
+      })),
     }));
+    return { prompts };
+  });
+
+  server.setRequestHandler(GetPromptRequestSchema, async (request: GetPromptRequest) => {
+    const { name, arguments: args } = request.params;
+    const messages = getPromptMessages(name, args ?? {});
+    return { messages };
+  });
+
+  // --- Tool handlers ---
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    const toolsForClient: Tool[] = Array.from(toolDefinitionMap.values()).map(entry => {
+      if (entry instanceof BaseTool) {
+        return entry.getToolDefinition();
+      }
+      return {
+        name: entry.name,
+        description: entry.description,
+        inputSchema: entry.inputSchema,
+        ...(entry.annotations && { annotations: entry.annotations }),
+      };
+    });
     return { tools: toolsForClient };
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest, context?: any): Promise<CallToolResult> => {
     const { name: toolName, arguments: toolArgs } = request.params;
-    const toolDefinition = toolDefinitionMap.get(toolName);
-    if (!toolDefinition) {
+    const entry = toolDefinitionMap.get(toolName);
+    if (!entry) {
       console.error(`Error: Unknown tool requested: ${toolName}`);
-      return { content: [{ type: "text", text: `Error: Unknown tool requested: ${toolName}` }] };
+      return { content: [{ type: "text", text: `Error: Unknown tool requested: ${toolName}` }], isError: true };
     }
     console.error(`Executing tool "${toolName}" with arguments ${JSON.stringify(toolArgs)} and securitySchemes ${JSON.stringify(securitySchemes)}`);
 
@@ -107,7 +146,12 @@ export function createServer(options?: CreateServerOptions): Server {
       }
     }
 
-    return await executeApiTool(toolName, toolDefinition, toolArgs ?? {}, securitySchemes, context?.bearerToken);
+    // Class-based tools handle their own validation and execution
+    if (entry instanceof BaseTool) {
+      return entry.handleRequest(toolArgs ?? {});
+    }
+
+    return await executeApiTool(toolName, entry, toolArgs ?? {}, securitySchemes, context?.bearerToken);
   });
 
   return server;
@@ -124,19 +168,19 @@ async function executeApiTool(
   bearerToken?: string
 ): Promise<CallToolResult> {
   try {
-    // Validate arguments against the input schema
+    // Validate arguments against the Zod schema (or fall back to permissive validation)
     let validatedArgs: JsonObject;
     try {
-      const zodSchema = getZodSchemaFromJsonSchema(definition.inputSchema, toolName);
+      const zodSchema = definition.zodSchema ?? z.object({}).passthrough();
       const argsToParse = (typeof toolArgs === 'object' && toolArgs !== null) ? toolArgs : {};
       validatedArgs = zodSchema.parse(argsToParse) as JsonObject;
     } catch (error: unknown) {
       if (error instanceof ZodError) {
         const validationErrorMessage = `Invalid arguments for tool '${toolName}': ${error.issues.map((e) => `${e.path.join('.')} (${e.code}): ${e.message}`).join(', ')}`;
-        return { content: [{ type: 'text', text: validationErrorMessage }] };
+        return { content: [{ type: 'text', text: validationErrorMessage }], isError: true };
       } else {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        return { content: [{ type: 'text', text: `Internal error during validation setup: ${errorMessage}` }] };
+        return { content: [{ type: 'text', text: `Internal error during validation setup: ${errorMessage}` }], isError: true };
       }
     }
 
@@ -312,7 +356,7 @@ async function executeApiTool(
     }
 
     console.error(`Error during execution of tool '${toolName}':`, errorMessage);
-    return { content: [{ type: "text", text: errorMessage }] };
+    return { content: [{ type: "text", text: errorMessage }], isError: true };
   }
 }
 
@@ -348,22 +392,3 @@ function formatApiError(error: AxiosError): string {
   return message;
 }
 
-/**
- * Converts a JSON Schema to a Zod schema for runtime validation
- */
-function getZodSchemaFromJsonSchema(jsonSchema: any, toolName: string): z.ZodTypeAny {
-  if (typeof jsonSchema !== 'object' || jsonSchema === null) {
-    return z.object({}).passthrough();
-  }
-  try {
-    const zodSchemaString = jsonSchemaToZod(jsonSchema);
-    const zodSchema = eval(zodSchemaString);
-    if (typeof zodSchema?.parse !== 'function') {
-      throw new Error('Eval did not produce a valid Zod schema.');
-    }
-    return zodSchema as z.ZodTypeAny;
-  } catch (err: any) {
-    console.error(`Failed to generate/evaluate Zod schema for '${toolName}':`, err);
-    return z.object({}).passthrough();
-  }
-}
