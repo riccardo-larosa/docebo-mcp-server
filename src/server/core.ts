@@ -14,9 +14,9 @@ import {
 import { McpToolDefinition } from "./tools/index.js";
 import { BaseTool } from "./tools/baseTool.js";
 import { coursesToolsMap } from './tools/courses.js';
-import { classroomsToolsMap } from './tools/classrooms.js';
 import { enrollmentsToolsMap } from './tools/enrollments.js';
 import { usersToolsMap } from './tools/users.js';
+import { notificationsToolsMap } from './tools/notifications.js';
 import { getPrompts, getPromptMessages } from './prompts/index.js';
 import './prompts/courseEnrollmentReport.js';
 import './prompts/learnerProgress.js';
@@ -46,9 +46,9 @@ export const API_BASE_URL = process.env.API_BASE_URL;
  */
 export const toolDefinitionMap: Map<string, ToolEntry> = new Map([
   ...coursesToolsMap,
-  ...classroomsToolsMap,
   ...enrollmentsToolsMap,
   ...usersToolsMap,
+  ...notificationsToolsMap,
 ]);
 
 /**

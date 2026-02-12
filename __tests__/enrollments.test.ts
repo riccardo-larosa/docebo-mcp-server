@@ -3,8 +3,8 @@ import { ZodError } from 'zod';
 import { enrollmentsToolsMap } from '../src/server/tools/enrollments.js';
 
 describe('Enrollment Tools', () => {
-  it('should have 2 tool definitions', () => {
-    expect(enrollmentsToolsMap.size).toBe(2);
+  it('should have 5 tool definitions', () => {
+    expect(enrollmentsToolsMap.size).toBe(5);
   });
 
   it('should have valid tool definitions', () => {
@@ -110,20 +110,138 @@ describe('Enrollment Tools', () => {
     });
   });
 
+  describe('get-user-progress', () => {
+    const tool = enrollmentsToolsMap.get('get-user-progress')!;
+
+    it('should have correct metadata', () => {
+      expect(tool.name).toBe('get-user-progress');
+      expect(tool.method).toBe('get');
+      expect(tool.pathTemplate).toBe('learn/v1/enrollments');
+      expect(tool.executionParameters).toHaveLength(4);
+    });
+
+    it('should have zodSchema and inputSchema', () => {
+      expect(tool.zodSchema).toBeDefined();
+      expect(tool.inputSchema).toHaveProperty('type', 'object');
+      expect(tool.inputSchema.properties).toHaveProperty('id_user');
+      expect(tool.inputSchema.required).toContain('id_user');
+    });
+
+    it('should require id_user', () => {
+      expect(() => tool.zodSchema!.parse({})).toThrow(ZodError);
+      expect(() => tool.zodSchema!.parse({ id_user: '123' })).not.toThrow();
+    });
+
+    it('should accept optional filters', () => {
+      expect(() => tool.zodSchema!.parse({
+        id_user: '123',
+        status: 'completed',
+        page: '0',
+        page_size: '20',
+      })).not.toThrow();
+    });
+
+    it('should have query parameters only', () => {
+      for (const param of tool.executionParameters) {
+        expect(param.in).toBe('query');
+      }
+    });
+
+    it('should have readOnly annotation', () => {
+      expect(tool.annotations!.readOnlyHint).toBe(true);
+      expect(tool.annotations!.destructiveHint).toBe(false);
+    });
+  });
+
+  describe('enroll-user', () => {
+    const tool = enrollmentsToolsMap.get('enroll-user')!;
+
+    it('should have correct metadata', () => {
+      expect(tool.name).toBe('enroll-user');
+      expect(tool.method).toBe('post');
+      expect(tool.pathTemplate).toBe('learn/v1/enrollments/{course_id}/{user_id}');
+      expect(tool.executionParameters).toHaveLength(2);
+      expect(tool.executionParameters[0]).toEqual({ name: 'course_id', in: 'path' });
+      expect(tool.executionParameters[1]).toEqual({ name: 'user_id', in: 'path' });
+    });
+
+    it('should require course_id and user_id', () => {
+      expect(() => tool.zodSchema!.parse({})).toThrow(ZodError);
+      expect(() => tool.zodSchema!.parse({ course_id: '1' })).toThrow(ZodError);
+      expect(() => tool.zodSchema!.parse({ course_id: '1', user_id: '2' })).not.toThrow();
+    });
+
+    it('should accept optional requestBody', () => {
+      expect(() => tool.zodSchema!.parse({
+        course_id: '1',
+        user_id: '2',
+        requestBody: { level: 3, date_begin_validity: '2025-01-01' },
+      })).not.toThrow();
+    });
+
+    it('should have application/json content type', () => {
+      expect(tool.requestBodyContentType).toBe('application/json');
+    });
+
+    it('should not be readOnly or destructive', () => {
+      expect(tool.annotations!.readOnlyHint).toBe(false);
+      expect(tool.annotations!.destructiveHint).toBe(false);
+    });
+  });
+
+  describe('unenroll-user', () => {
+    const tool = enrollmentsToolsMap.get('unenroll-user')!;
+
+    it('should have correct metadata', () => {
+      expect(tool.name).toBe('unenroll-user');
+      expect(tool.method).toBe('delete');
+      expect(tool.pathTemplate).toBe('learn/v1/enrollments/{id_course}/{id_user}');
+      expect(tool.executionParameters).toHaveLength(2);
+      expect(tool.executionParameters[0]).toEqual({ name: 'id_course', in: 'path' });
+      expect(tool.executionParameters[1]).toEqual({ name: 'id_user', in: 'path' });
+    });
+
+    it('should require id_course and id_user', () => {
+      expect(() => tool.zodSchema!.parse({})).toThrow(ZodError);
+      expect(() => tool.zodSchema!.parse({ id_course: '1', id_user: '2' })).not.toThrow();
+    });
+
+    it('should be marked as destructive', () => {
+      expect(tool.annotations!.readOnlyHint).toBe(false);
+      expect(tool.annotations!.destructiveHint).toBe(true);
+      expect(tool.annotations!.idempotentHint).toBe(true);
+    });
+
+    it('should not have a request body content type', () => {
+      expect(tool.requestBodyContentType).toBeUndefined();
+    });
+  });
+
   describe('Annotations', () => {
     it('should have annotations on all enrollment tools', () => {
       for (const tool of enrollmentsToolsMap.values()) {
         expect(tool.annotations).toBeDefined();
         expect(tool.annotations).toHaveProperty('title');
-        expect(tool.annotations!.readOnlyHint).toBe(true);
-        expect(tool.annotations!.destructiveHint).toBe(false);
-        expect(tool.annotations!.idempotentHint).toBe(true);
       }
     });
 
-    it('should have openWorldHint=true on list, false on get', () => {
+    it('read-only tools should have readOnlyHint=true', () => {
+      expect(enrollmentsToolsMap.get('list-enrollments')!.annotations!.readOnlyHint).toBe(true);
+      expect(enrollmentsToolsMap.get('get-enrollment-details')!.annotations!.readOnlyHint).toBe(true);
+      expect(enrollmentsToolsMap.get('get-user-progress')!.annotations!.readOnlyHint).toBe(true);
+    });
+
+    it('write tools should have readOnlyHint=false', () => {
+      expect(enrollmentsToolsMap.get('enroll-user')!.annotations!.readOnlyHint).toBe(false);
+      expect(enrollmentsToolsMap.get('unenroll-user')!.annotations!.readOnlyHint).toBe(false);
+    });
+
+    it('should have openWorldHint=true on list-style, false on targeted tools', () => {
       expect(enrollmentsToolsMap.get('list-enrollments')!.annotations!.openWorldHint).toBe(true);
       expect(enrollmentsToolsMap.get('get-enrollment-details')!.annotations!.openWorldHint).toBe(false);
+      expect(enrollmentsToolsMap.get('get-user-progress')!.annotations!.openWorldHint).toBe(true);
+      expect(enrollmentsToolsMap.get('enroll-user')!.annotations!.openWorldHint).toBe(false);
+      expect(enrollmentsToolsMap.get('unenroll-user')!.annotations!.openWorldHint).toBe(false);
     });
   });
 });

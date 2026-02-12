@@ -132,17 +132,16 @@ describe('Learner Progress Prompt', () => {
     await import('../src/server/prompts/learnerProgress.js');
   });
 
-  it('should generate correct messages without classroom_name', () => {
-    const messages = getPromptMessages('learner-progress', {});
+  it('should generate correct messages with user_id', () => {
+    const messages = getPromptMessages('learner-progress', { user_id: '123' });
     expect(messages).toHaveLength(1);
     expect(messages[0].role).toBe('user');
-    expect(messages[0].content.text).toContain('list-all-classrooms');
-    expect(messages[0].content.text).toContain('get-a-classroom');
-    expect(messages[0].content.text).toContain('Include all available classrooms');
+    expect(messages[0].content.text).toContain('get-user-progress');
+    expect(messages[0].content.text).toContain('get-enrollment-details');
+    expect(messages[0].content.text).toContain('123');
   });
 
-  it('should generate messages filtered by classroom_name', () => {
-    const messages = getPromptMessages('learner-progress', { classroom_name: 'Safety Training' });
-    expect(messages[0].content.text).toContain('Safety Training');
+  it('should require user_id argument', () => {
+    expect(() => getPromptMessages('learner-progress', {})).toThrow('Missing required argument: user_id');
   });
 });

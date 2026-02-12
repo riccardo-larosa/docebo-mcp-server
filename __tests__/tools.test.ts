@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ZodError } from 'zod';
 import { coursesToolsMap } from '../src/server/tools/courses.js';
-import { classroomsToolsMap } from '../src/server/tools/classrooms.js';
 import type { McpToolDefinition } from '../src/server/tools/index.js';
 
 describe('Tool Definitions', () => {
@@ -103,42 +102,9 @@ describe('Tool Definitions', () => {
     });
   });
 
-  describe('Classrooms Tools', () => {
-    it('should have valid tool definitions', () => {
-      expect(classroomsToolsMap.size).toBeGreaterThan(0);
-
-      for (const [toolName, toolDef] of classroomsToolsMap) {
-        // Verify tool definition structure
-        expect(toolDef).toMatchObject({
-          name: expect.any(String),
-          description: expect.any(String),
-          inputSchema: expect.any(Object),
-          method: expect.any(String),
-          pathTemplate: expect.any(String),
-          executionParameters: expect.any(Array),
-          securityRequirements: expect.any(Array)
-        });
-
-        // Verify name consistency
-        expect(toolDef.name).toBe(toolName);
-
-        // Verify path template format
-        expect(toolDef.pathTemplate).toMatch(/^[a-z]+\/v\d+\/[a-z\/{}]+$/);
-      }
-    });
-  });
-
   describe('Combined Tool Map', () => {
-    it('should not have duplicate tool names between modules', () => {
-      const courseToolNames = Array.from(coursesToolsMap.keys());
-      const classroomToolNames = Array.from(classroomsToolsMap.keys());
-
-      const duplicates = courseToolNames.filter(name => classroomToolNames.includes(name));
-      expect(duplicates).toHaveLength(0);
-    });
-
     it('should have consistent security requirements across tools', () => {
-      const allTools = [...coursesToolsMap.values(), ...classroomsToolsMap.values()];
+      const allTools = [...coursesToolsMap.values()];
 
       for (const tool of allTools) {
         // All tools should require bearer authentication
@@ -150,7 +116,6 @@ describe('Tool Definitions', () => {
   describe('Zod Schemas', () => {
     const allTools: McpToolDefinition[] = [
       ...coursesToolsMap.values(),
-      ...classroomsToolsMap.values(),
     ];
 
     it('should have zodSchema defined on all tools', () => {
@@ -167,12 +132,6 @@ describe('Tool Definitions', () => {
 
       const getCourse = coursesToolsMap.get('get-a-course')!;
       expect(() => getCourse.zodSchema!.parse({ course_id: '123' })).not.toThrow();
-
-      const listClassrooms = classroomsToolsMap.get('list-all-classrooms')!;
-      expect(() => listClassrooms.zodSchema!.parse({})).not.toThrow();
-
-      const getClassroom = classroomsToolsMap.get('get-a-classroom')!;
-      expect(() => getClassroom.zodSchema!.parse({ id: '456' })).not.toThrow();
     });
 
     it('should reject incorrect input via zodSchema.parse()', () => {
@@ -181,9 +140,6 @@ describe('Tool Definitions', () => {
       expect(() => getCourse.zodSchema!.parse({})).toThrow(ZodError);
       // Wrong type
       expect(() => getCourse.zodSchema!.parse({ course_id: 123 })).toThrow(ZodError);
-
-      const getClassroom = classroomsToolsMap.get('get-a-classroom')!;
-      expect(() => getClassroom.zodSchema!.parse({})).toThrow(ZodError);
     });
 
     it('should have inputSchema derived as valid JSON Schema', () => {
@@ -198,7 +154,6 @@ describe('Tool Definitions', () => {
   describe('Annotations', () => {
     const allTools: McpToolDefinition[] = [
       ...coursesToolsMap.values(),
-      ...classroomsToolsMap.values(),
     ];
 
     it('should have annotations present on all tools', () => {

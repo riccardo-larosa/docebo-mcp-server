@@ -2,32 +2,26 @@ import { registerPrompt } from "./index.js";
 
 registerPrompt({
   name: "learner-progress",
-  description: "Guided workflow for checking learner progress via classroom sessions.",
+  description: "Guided workflow for checking a learner's course progress and enrollment status.",
   arguments: [
     {
-      name: "classroom_name",
-      description: "Optional classroom name to filter by. If omitted, all classrooms are included.",
-      required: false,
+      name: "user_id",
+      description: "The Docebo user ID to check progress for. Required.",
+      required: true,
     },
   ],
   getMessages: (args) => {
-    const classroomFilter = args.classroom_name
-      ? `Focus on classrooms matching "${args.classroom_name}".`
-      : "Include all available classrooms.";
-
     return [
       {
         role: "user",
         content: {
           type: "text",
-          text: `Check learner progress across classroom sessions on the Docebo learning platform.
-
-${classroomFilter}
+          text: `Check learner progress for user ID ${args.user_id} on the Docebo learning platform.
 
 Steps:
-1. Use the "list-all-classrooms" tool to retrieve available classroom sessions.
-2. For each relevant classroom, use the "get-a-classroom" tool to get detailed session and attendance information.
-3. Summarize the results in a table with columns: Classroom Name, Classroom ID, Schedule, Capacity, and Attendance Status.
+1. Use the "get-user-progress" tool with id_user="${args.user_id}" to retrieve all enrollments for this user.
+2. For any enrollment of interest, use the "get-enrollment-details" tool to get detailed completion and score information.
+3. Summarize the results in a table with columns: Course Name, Course ID, Status, Completion %, Score, and Enrollment Date.
 
 Present the report in a clear, structured format.`,
         },

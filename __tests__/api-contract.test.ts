@@ -167,6 +167,27 @@ describeContract('API Contract Tests', () => {
       }
     });
 
+    it('GET learn/v1/enrollments?id_user=…&page_size=1 → items for a user (get-user-progress)', async () => {
+      if (!enrollmentUserId) {
+        console.warn('⚠ Skipping get-user-progress: no enrollment found in list');
+        return;
+      }
+
+      const res = await api.get('learn/v1/enrollments', {
+        params: { id_user: enrollmentUserId, page_size: 1 },
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.data.data).toHaveProperty('items');
+      expect(Array.isArray(res.data.data.items)).toBe(true);
+
+      if (res.data.data.items.length > 0) {
+        const item = res.data.data.items[0];
+        expect(item).toHaveProperty('user_id');
+        expect(item).toHaveProperty('status');
+      }
+    });
+
     it('GET learn/v1/enrollments/{id_course}/{id_user} → has data.records', async () => {
       if (!enrollmentUserId || !enrollmentCourseId) {
         console.warn('⚠ Skipping get-enrollment-details: no enrollment found in list');
@@ -182,17 +203,4 @@ describeContract('API Contract Tests', () => {
     });
   });
 
-  // ── Classrooms ───────────────────────────────────────────────────────
-
-  describe('Classrooms', () => {
-    it('GET learn/v1/classroom?page_size=1 → has items array', async () => {
-      const res = await api.get('learn/v1/classroom', {
-        params: { page_size: 1 },
-      });
-
-      expect(res.status).toBe(200);
-      expect(res.data.data).toHaveProperty('items');
-      expect(Array.isArray(res.data.data.items)).toBe(true);
-    });
-  });
 });

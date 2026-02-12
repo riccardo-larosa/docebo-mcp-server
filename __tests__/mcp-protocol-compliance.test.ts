@@ -45,10 +45,10 @@ describe('MCP Protocol Compliance Tests', () => {
     );
 
     mcpServer.registerTool(
-      'getClassrooms',
+      'getEnrollments',
       {
-        title: 'Get Classrooms',
-        description: 'Retrieve classrooms from Docebo',
+        title: 'Get Enrollments',
+        description: 'Retrieve enrollments from Docebo',
         inputSchema: {
           page: z.number().optional().default(1),
           pageSize: z.number().optional().default(20)
@@ -58,8 +58,8 @@ describe('MCP Protocol Compliance Tests', () => {
         content: [{
           type: 'text',
           text: JSON.stringify({
-            classrooms: [
-              { id: 1, name: 'Test Classroom', capacity: 30 }
+            enrollments: [
+              { id: 1, user_id: 10, course_id: 20, status: 'completed' }
             ],
             pagination: { page, pageSize, total: 1 }
           })
@@ -307,11 +307,11 @@ describe('MCP Protocol Compliance Tests', () => {
       expect(getCoursesTool?.description).toBe('Retrieve courses from Docebo');
       expect(getCoursesTool?.inputSchema).toBeDefined();
       
-      // Verify getClassrooms tool
-      const getClassroomsTool = response.tools.find(t => t.name === 'getClassrooms');
-      expect(getClassroomsTool).toBeDefined();
-      expect(getClassroomsTool?.description).toBe('Retrieve classrooms from Docebo');
-      expect(getClassroomsTool?.inputSchema).toBeDefined();
+      // Verify getEnrollments tool
+      const getEnrollmentsTool = response.tools.find(t => t.name === 'getEnrollments');
+      expect(getEnrollmentsTool).toBeDefined();
+      expect(getEnrollmentsTool?.description).toBe('Retrieve enrollments from Docebo');
+      expect(getEnrollmentsTool?.inputSchema).toBeDefined();
     });
 
     it('should execute tools with valid parameters', async () => {
@@ -445,7 +445,7 @@ describe('MCP Protocol Compliance Tests', () => {
       // Send multiple requests and verify responses match
       const requests = [
         { name: 'getCourses', arguments: { page: 1 } },
-        { name: 'getClassrooms', arguments: { page: 2 } },
+        { name: 'getEnrollments', arguments: { page: 2 } },
         { name: 'getCourses', arguments: { page: 3 } }
       ];
 
@@ -459,11 +459,11 @@ describe('MCP Protocol Compliance Tests', () => {
       expect(courses1).toHaveProperty('courses');
       expect(courses1.pagination.page).toBe(1);
 
-      // Verify second request (getClassrooms page 2)
-      const classroomsContent = (results[1] as any).content[0] as { type: 'text'; text: string };
-      const classrooms = JSON.parse(classroomsContent.text);
-      expect(classrooms).toHaveProperty('classrooms');
-      expect(classrooms.pagination.page).toBe(2);
+      // Verify second request (getEnrollments page 2)
+      const enrollmentsContent = (results[1] as any).content[0] as { type: 'text'; text: string };
+      const enrollments = JSON.parse(enrollmentsContent.text);
+      expect(enrollments).toHaveProperty('enrollments');
+      expect(enrollments.pagination.page).toBe(2);
 
       // Verify third request (getCourses page 3)
       const courses3Content = (results[2] as any).content[0] as { type: 'text'; text: string };
