@@ -37,7 +37,7 @@ ${interestFilter}
 
 Steps:
 1. ${args.user_name ? `Use "list-users" to find "${args.user_name}", then "get-user" to retrieve their profile (role, department, branch).` : 'Ask the user to identify themselves, then look them up with "list-users" and "get-user".'}
-2. Use "list-enrollments" with the user's user_id to retrieve their completed and in-progress courses.
+2. Use "list-enrollments" with the user's id_user to retrieve their completed and in-progress courses.
 3. Use "list-all-courses"${args.interest_area ? ` with search_text="${args.interest_area}"` : ""} to browse the available course catalog. Also try filtering by category or status=published to find relevant offerings.
 4. Analyze gaps: compare what the employee has completed vs. what is available and relevant to their role/department/interests.
 5. Present the top recommendations in a table with columns: Course Name, Category, Why Recommended, Relevance (High/Medium/Low).

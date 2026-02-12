@@ -51,19 +51,19 @@ describe('Enrollment Tools', () => {
 
     it('should validate correct input (all optional)', () => {
       expect(() => tool.zodSchema!.parse({})).not.toThrow();
-      expect(() => tool.zodSchema!.parse({ user_id: '123', page: '0', page_size: '10' })).not.toThrow();
-      expect(() => tool.zodSchema!.parse({ course_id: '456', status: 'completed' })).not.toThrow();
+      expect(() => tool.zodSchema!.parse({ id_user: '123', page: '0', page_size: '10' })).not.toThrow();
+      expect(() => tool.zodSchema!.parse({ id_course: '456', status: 'completed' })).not.toThrow();
     });
 
     it('should reject invalid input', () => {
-      expect(() => tool.zodSchema!.parse({ user_id: 123 })).toThrow(ZodError);
+      expect(() => tool.zodSchema!.parse({ id_user: 123 })).toThrow(ZodError);
       expect(() => tool.zodSchema!.parse({ status: true })).toThrow(ZodError);
     });
 
     it('should have correct query parameters', () => {
       const paramNames = tool.executionParameters.map(p => p.name);
-      expect(paramNames).toContain('user_id');
-      expect(paramNames).toContain('course_id');
+      expect(paramNames).toContain('id_user');
+      expect(paramNames).toContain('id_course');
       expect(paramNames).toContain('status');
       expect(paramNames).toContain('page');
       expect(paramNames).toContain('page_size');
@@ -79,29 +79,34 @@ describe('Enrollment Tools', () => {
     it('should have correct metadata', () => {
       expect(tool.name).toBe('get-enrollment-details');
       expect(tool.method).toBe('get');
-      expect(tool.pathTemplate).toBe('learn/v1/enrollments/{enrollment_id}');
-      expect(tool.executionParameters).toHaveLength(1);
-      expect(tool.executionParameters[0]).toEqual({ name: 'enrollment_id', in: 'path' });
+      expect(tool.pathTemplate).toBe('learn/v1/enrollments/{id_course}/{id_user}');
+      expect(tool.executionParameters).toHaveLength(2);
+      expect(tool.executionParameters[0]).toEqual({ name: 'id_course', in: 'path' });
+      expect(tool.executionParameters[1]).toEqual({ name: 'id_user', in: 'path' });
     });
 
     it('should have zodSchema and inputSchema', () => {
       expect(tool.zodSchema).toBeDefined();
       expect(typeof tool.zodSchema!.parse).toBe('function');
       expect(tool.inputSchema).toHaveProperty('type', 'object');
-      expect(tool.inputSchema.properties).toHaveProperty('enrollment_id');
-      expect(tool.inputSchema.required).toContain('enrollment_id');
+      expect(tool.inputSchema.properties).toHaveProperty('id_course');
+      expect(tool.inputSchema.properties).toHaveProperty('id_user');
+      expect(tool.inputSchema.required).toContain('id_course');
+      expect(tool.inputSchema.required).toContain('id_user');
     });
 
     it('should validate correct input', () => {
-      expect(() => tool.zodSchema!.parse({ enrollment_id: '789' })).not.toThrow();
+      expect(() => tool.zodSchema!.parse({ id_course: '2', id_user: '13242' })).not.toThrow();
     });
 
-    it('should reject missing required field', () => {
+    it('should reject missing required fields', () => {
       expect(() => tool.zodSchema!.parse({})).toThrow(ZodError);
+      expect(() => tool.zodSchema!.parse({ id_course: '2' })).toThrow(ZodError);
+      expect(() => tool.zodSchema!.parse({ id_user: '13242' })).toThrow(ZodError);
     });
 
     it('should reject wrong type', () => {
-      expect(() => tool.zodSchema!.parse({ enrollment_id: 789 })).toThrow(ZodError);
+      expect(() => tool.zodSchema!.parse({ id_course: 2, id_user: 13242 })).toThrow(ZodError);
     });
   });
 

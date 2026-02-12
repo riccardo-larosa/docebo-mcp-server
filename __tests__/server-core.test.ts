@@ -462,7 +462,7 @@ describe('Server Core — CallTool handler', () => {
     });
 
     const result = await callToolHandler({
-      params: { name: 'list-enrollments', arguments: { user_id: '10' } },
+      params: { name: 'list-enrollments', arguments: { id_user: '10' } },
     });
 
     expect(result.isError).toBeUndefined();
@@ -471,7 +471,7 @@ describe('Server Core — CallTool handler', () => {
 
     const axiosCall = mockAxios.mock.calls[0][0];
     expect(axiosCall.url).toContain('/learn/v1/enrollments');
-    expect(axiosCall.params.user_id).toBe('10');
+    expect(axiosCall.params.id_user).toBe('10');
   });
 
   it('should execute list-users and return API response', async () => {

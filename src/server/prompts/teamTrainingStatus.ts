@@ -36,7 +36,7 @@ ${trainingFilter}
 
 Steps:
 1. Use the "list-users" tool to find team members${args.team_member ? ` (search for "${args.team_member}")` : ""}.
-2. For each user found, use the "list-enrollments" tool with their user_id to retrieve their enrollments.
+2. For each user found, use the "list-enrollments" tool with their id_user to retrieve their enrollments.
 3. ${args.training_name ? `Use the "list-all-courses" tool to find courses matching "${args.training_name}" and cross-reference with enrollments.` : 'Optionally use the "list-all-courses" tool to enrich course names and details.'}
 4. Summarize the results in a table with columns: Team Member, Course, Status, Completion %, Due Date.
 

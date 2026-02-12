@@ -2,15 +2,16 @@ import { z } from "zod";
 import { McpToolDefinition } from "./index.js";
 
 const listEnrollmentsSchema = z.object({
-  user_id: z.string().optional().describe("Filter enrollments by user ID"),
-  course_id: z.string().optional().describe("Filter enrollments by course ID"),
+  id_user: z.string().optional().describe("Filter enrollments by user ID"),
+  id_course: z.string().optional().describe("Filter enrollments by course ID"),
   status: z.string().optional().describe("Filter by enrollment status (e.g., subscribed, in_progress, completed)"),
   page: z.string().optional().describe("Zero-based page offset"),
   page_size: z.string().optional().describe("Max records per page"),
 });
 
 const getEnrollmentDetailsSchema = z.object({
-  enrollment_id: z.string().describe("The unique enrollment ID"),
+  id_course: z.string().describe("The course ID"),
+  id_user: z.string().describe("The user ID"),
 });
 
 export const enrollmentsToolsMap: Map<string, McpToolDefinition> = new Map([
@@ -22,8 +23,8 @@ Returns: Collection of enrollments with user, course, status, and completion dat
 
 Usage Guidance:
   - Use to check who is enrolled in what, and their progress.
-  - Filter by user_id to see a specific user's enrollments.
-  - Filter by course_id to see all enrollees for a specific course.
+  - Filter by id_user to see a specific user's enrollments.
+  - Filter by id_course to see all enrollees for a specific course.
   - Filter by status to find completed, in-progress, or subscribed enrollments.
   - Supports pagination via page and page_size parameters.`,
     inputSchema: z.toJSONSchema(listEnrollmentsSchema),
@@ -31,8 +32,8 @@ Usage Guidance:
     method: "get",
     pathTemplate: "learn/v1/enrollments",
     executionParameters: [
-      { "name": "user_id", "in": "query" },
-      { "name": "course_id", "in": "query" },
+      { "name": "id_user", "in": "query" },
+      { "name": "id_course", "in": "query" },
       { "name": "status", "in": "query" },
       { "name": "page", "in": "query" },
       { "name": "page_size", "in": "query" },
@@ -49,18 +50,21 @@ Usage Guidance:
   }],
   ["get-enrollment-details", {
     name: "get-enrollment-details",
-    description: `Purpose: Retrieves detailed information about a single enrollment by its ID.
+    description: `Purpose: Retrieves detailed information about a specific enrollment for a given course and user.
 
-Returns: Full enrollment object including completion percentage, dates, status, and course/user references.
+Returns: Full enrollment object including completion percentage, dates, status, score, and subscription info.
 
 Usage Guidance:
-  - Use when you have a specific enrollment_id from list-enrollments.
+  - Use when you have both a course ID and user ID and need full enrollment details.
   - Use list-enrollments first to find enrollments by user or course.`,
     inputSchema: z.toJSONSchema(getEnrollmentDetailsSchema),
     zodSchema: getEnrollmentDetailsSchema,
     method: "get",
-    pathTemplate: "learn/v1/enrollments/{enrollment_id}",
-    executionParameters: [{ "name": "enrollment_id", "in": "path" }],
+    pathTemplate: "learn/v1/enrollments/{id_course}/{id_user}",
+    executionParameters: [
+      { "name": "id_course", "in": "path" },
+      { "name": "id_user", "in": "path" },
+    ],
     requestBodyContentType: undefined,
     securityRequirements: [{ "bearerAuth": [] }],
     annotations: {
