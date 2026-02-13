@@ -1,0 +1,8 @@
+src/
+__tests__/
+coverage/
+.env*
+tsconfig.json
+CLAUDE.md
+scripts/
+Untitled

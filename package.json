@@ -1,8 +1,7 @@
 {
   "name": "docebo-mcp-server",
   "version": "0.2.0",
-  "description": "Docebo MCP server",
-  "main": "index.js",
+  "description": "MCP server that bridges Claude and other MCP clients to the Docebo Learning Platform API",
   "scripts": {
     "test": "vitest run",
     "coverage": "vitest run --coverage",
@@ -10,11 +9,31 @@
     "start:simpleClient": "node build/client/simpleStreamableHttpClient.js",
     "build": "tsc -b",
     "dev:hono": "tsc-watch --onSuccess \"node build/server/hono-index.js\"",
-    "start:stdio": "node build/server/stdio-index.js"
+    "start:stdio": "node build/server/stdio-index.js",
+    "prepublishOnly": "npm run build && npm test"
   },
-  "keywords": [],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "docebo",
+    "lms",
+    "learning-management",
+    "claude",
+    "ai"
+  ],
   "author": "Riccardo La Rosa <rlarosa@gmail.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/riccardo-larosa/docebo-mcp-server.git"
+  },
+  "homepage": "https://github.com/riccardo-larosa/docebo-mcp-server#readme",
+  "bugs": {
+    "url": "https://github.com/riccardo-larosa/docebo-mcp-server/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "type": "module",
   "bin": {
     "docebo-mcp-server": "build/server/stdio-index.js"

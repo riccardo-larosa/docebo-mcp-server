@@ -1,114 +1,178 @@
-# MCP Streamable HTTP Server Example
+# Docebo MCP Server
 
-This directory contains an example implementation of a Model Context Protocol (MCP) server using the `@modelcontextprotocol/sdk`.
+An [MCP](https://modelcontextprotocol.io/) (Model Context Protocol) server that bridges Claude and other MCP clients to the [Docebo Learning Platform API](https://www.docebo.com/).
 
-It utilizes the `StreamableHTTPServerTransport` to handle MCP communication over HTTP, supporting bidirectional communication including server-sent events (SSE) for notifications.
+**What is MCP?**
 
-It also includes the `simpleStreamableHttpClient.ts` to start a client and interact with the server
+[MCP](https://modelcontextprotocol.io/) is an open standard that lets AI models interact with external tools and data through a consistent interface. This server gives any MCP-compatible client (Claude Desktop, Claude Code, Cursor, and [others](https://modelcontextprotocol.io/clients)) the ability to read and manage your Docebo learning platform.
 
-## Features
+## Quick Start
 
-*   Implements the Model Context Protocol (MCP).
-*   Uses `StreamableHTTPServerTransport` for HTTP-based communication.
-*   Manages client sessions using the `mcp-session-id` header.
-*   Handles client requests (POST), server notifications (GET via SSE), and session termination (DELETE).
-*   Includes a basic example tool (`echo`).
-*   Built with TypeScript and hono server.
+```bash
+# Run directly with npx (no install needed)
+npx -y docebo-mcp-server
+
+# Or install globally
+npm install -g docebo-mcp-server
+docebo-mcp-server
+```
 
 ## Prerequisites
 
-*   Node.js (version recommended by the project, e.g., >= 18)
-*   npm or yarn
+- Node.js >= 18
+- A Docebo platform instance with API credentials (OAuth client ID/secret + user credentials)
 
-## Installation
+## Setup
 
-1.  Navigate to the `docebo-mcp-server` directory:
-    ```bash
-    cd docebo-mcp-server
-    ```
-2.  Install dependencies:
-    ```bash
-    npm install
-    ```
+### Claude Desktop
 
-## Building
-
-To compile the TypeScript code to JavaScript:
-
-```bash
-npm run build
-```
-
-This will output the compiled files to a `build` directory.
-
-
-
-By default, the server listens on port 3000 and exposes the MCP endpoint at `/mcp`.
-
-## API Endpoint
-
-*   **URL**: `/mcp`
-*   **Methods**:
-    *   `POST`: Used by clients to send requests (including the initial `initialize` request).
-    *   `GET`: Used by clients to establish an SSE connection for receiving server-to-client notifications.
-    *   `DELETE`: Used by clients to terminate the current MCP session.
-
-## Session Management
-
-The server manages client sessions using the `mcp-session-id` HTTP header. 
-
-1.  When a client sends an `initialize` request without a session ID, the server creates a new session and a new transport, returning the `sessionId` in the response.
-2.  Subsequent requests (POST, GET, DELETE) from the client **must** include the assigned `mcp-session-id` header for the server to route the request to the correct transport instance.
-3.  The `DELETE /mcp` request terminates the session associated with the provided `mcp-session-id`.
-
-## Tools
-
-Tools can be added in the tools directory
-
-## Run the Server
-```bash
-npm run dev:hono
-```
-
-## Running the Client
-
-Use the [MCP inspector](https://github.com/modelcontextprotocol/inspector) 
-```bash
-npx @modelcontextprotocol/inspector
-```
-or you can use a CLI
-
-```bash
-npm run start:simpleClient
-```
-
-You can use the commands shown in this client to interact with the server, like 
-
-```bash
-list-tools
-```
-
-Claude Desktop as of this writing doesn't support HttpStreamable protocol.
-Add the server configuration to your Claude Desktop config file (usually located at ~/Library/Application Support/Claude/claude_desktop_config.json in macOS) and restart Claude Desktop:
+Add the following to your Claude Desktop config file (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
 
 ```json
 {
   "mcpServers": {
     "docebo": {
       "command": "npx",
-      "args": ["mcp-remote", "http://127.0.0.1:3000/mcp"],
+      "args": ["-y", "docebo-mcp-server"],
       "env": {
-        "BEARER_TOKEN_BEARERAUTH": "<your_token>"
+        "API_BASE_URL": "https://your-instance.docebosaas.com",
+        "DOCEBO_CLIENT_ID": "your-client-id",
+        "DOCEBO_CLIENT_SECRET": "your-client-secret",
+        "DOCEBO_USERNAME": "your-username",
+        "DOCEBO_PASSWORD": "your-password"
       }
     }
   }
 }
 ```
 
-Remote MCP Server are still being developed/enhanced by different MCP Hosts like Claude Desktop.
+Restart Claude Desktop after saving. The server will appear in the tools menu.
 
-MCP servers can be deployed in 2 different ways:
-1. Local MCP Server with Remote API
+### Claude Code
+
+```bash
+claude mcp add docebo -- npx -y docebo-mcp-server
+```
+
+Then set the required environment variables in your shell before launching Claude Code, or use a `.env`-style approach supported by your shell.
+
+## Example Usage
+
+Once set up, try these example prompts:
+
+### Track Learner Progress
+
+- Show me the progress for user 12345 across all their courses.
+- Which courses has Jane Smith not completed yet?
+- Summarize the enrollment status for the "Onboarding" course.
+
+### Manage Enrollments
+
+- Enroll user 12345 in the "Compliance Training" course.
+- List all enrollments for course 456.
+- Remove user 67890 from the "Leadership Workshop" course.
+
+### Search Courses
+
+- Find all courses related to "leadership".
+- Show me the details for course 456.
+- List courses sorted by name.
+
+### Send Notifications
+
+- Send a training reminder email to user 12345.
+- Trigger a learning plan notification for user 67890.
+
+## Tools
+
+### Courses
+
+| Tool | Method | Description |
+|------|--------|-------------|
+| `list-all-courses` | GET | List and search courses with filters (name, category, status, sorting) |
+| `get-a-course` | GET | Get full details for a single course by ID |
+
+### Enrollments
+
+| Tool | Method | Description |
+|------|--------|-------------|
+| `list-enrollments` | GET | List enrollments with optional user/course/status filters |
+| `get-enrollment-details` | GET | Get detailed enrollment info for a specific course + user |
+| `get-user-progress` | GET | Get all enrollments for a user (progress summary) |
+| `enroll-user` | POST | Enroll a user into a course |
+| `unenroll-user` | DELETE | Remove a user's enrollment from a course |
+
+### Users
+
+| Tool | Method | Description |
+|------|--------|-------------|
+| `list-users` | GET | List platform users with pagination |
+| `get-user` | GET | Get details for a single user by ID |
+
+### Notifications
+
+| Tool | Method | Description |
+|------|--------|-------------|
+| `send-training-reminder` | POST | Send a custom email to a user |
+| `send-learning-plan-notification` | POST | Trigger a learning plan notification for a user |
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `API_BASE_URL` | Yes | Your Docebo instance URL (e.g., `https://your-instance.docebosaas.com`) |
+| `DOCEBO_CLIENT_ID` | stdio | OAuth client ID |
+| `DOCEBO_CLIENT_SECRET` | stdio | OAuth client secret |
+| `DOCEBO_USERNAME` | stdio | Docebo username for OAuth password grant |
+| `DOCEBO_PASSWORD` | stdio | Docebo password for OAuth password grant |
+| `BEARER_TOKEN_BEARERAUTH` | HTTP | Pre-obtained bearer token (HTTP transport only) |
+| `PORT` | No | Server port (default: 3000) |
+| `LOG_LEVEL` | No | Log level (default: info) |
+
+## Development
+
+### HTTP Server
+
+The server also supports Streamable HTTP transport for remote/web clients:
+
+```bash
+npm run dev:hono
+```
+
+The server listens on port 3000 by default and exposes the MCP endpoint at `/mcp`.
+
+#### HTTP API
+
+- **POST `/mcp`** — Client requests (including `initialize`)
+- **GET `/mcp`** — SSE connection for server-to-client notifications
+- **DELETE `/mcp`** — Terminate the MCP session
+- **GET `/health`** — Health check
+
+Sessions are tracked via the `mcp-session-id` HTTP header.
+
+### Testing
+
+```bash
+npm test                                # All tests
+npm run coverage                        # Tests with coverage
+npm run test:contract                   # API contract tests (requires credentials)
+```
+
+### Debugging
+
+Use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector):
+
+```bash
+npx @modelcontextprotocol/inspector
+```
+
+Or the built-in CLI client:
+
+```bash
+npm run start:simpleClient
+```
+
+### Architecture
 
 ```mermaid
 graph LR
@@ -116,43 +180,17 @@ graph LR
         C1[MCP Host w/ Client]
         S1[MCP Server]
     end
-    
+
     subgraph "Remote Servers"
-        API1[Remote API]
+        API1[Docebo API]
     end
-    
+
     C1 <--> S1
     S1 <--> API1
 
   style C1 fill:#2e7d32,color:#ffffff
   style S1 fill:#f57c00,color:#ffffff
   style API1 fill:#c2185b,color:#ffffff
-
 ```
 
-2. Local Host/Client connecting to Remote MCP Server
-```mermaid
-graph LR
-    subgraph "Your Computer "
-        C2[MCP Host w/ Client]
-    end
-    
-    subgraph "Remote Server"
-        S2[MCP Server]
-        API2[Remote API]
-    end
-    
-    C2 <-.-> S2
-    S2 <--> API2
-
-  style C2 fill:#2e7d32,color:#ffffff
-  style S2 fill:#f57c00,color:#ffffff
-  style API2 fill:#c2185b,color:#ffffff
-
-```
-
-There are 2 forms of authorization: 
-1. MCP protocol provides authorization capabilities at the transport level, enabling MCP clients to make requests to restricted MCP servers on behalf of resource owners. This is what the new Authorization proposal addresses. 
-2. The MCP Server needs to know how to authenticate with the remote APIs as well.
-
-This application needs a bearer token that is then passed from the MCP Client to the MCP Server and the MCP Server uses this to call the remote APIs. This system is not ideal if the MCP Server have to deal with more than one remote API system.
+Tool definitions are declarative data structures (not code). Each tool specifies an HTTP method, path template, parameter bindings, and JSON Schema. The execution engine in `core.ts` handles validation, URL construction, auth, and HTTP calls generically.
