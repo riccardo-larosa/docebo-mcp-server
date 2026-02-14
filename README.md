@@ -125,7 +125,7 @@ Once set up, try these example prompts:
 | `DOCEBO_CLIENT_SECRET` | stdio | OAuth client secret |
 | `DOCEBO_USERNAME` | stdio | Docebo username for OAuth password grant |
 | `DOCEBO_PASSWORD` | stdio | Docebo password for OAuth password grant |
-| `BEARER_TOKEN_BEARERAUTH` | HTTP | Pre-obtained bearer token (HTTP transport only) |
+| `MCP_SERVER_URL` | HTTP | Public URL of this server (enables OAuth resource server) |
 | `PORT` | No | Server port (default: 3000) |
 | `LOG_LEVEL` | No | Log level (default: info) |
 

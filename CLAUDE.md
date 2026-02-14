@@ -22,9 +22,6 @@ npm run coverage                        # Run tests with coverage report
 ./scripts/test.sh all                   # Full suite: build + typecheck + tests + coverage
 ./scripts/test.sh mcp                   # MCP protocol compliance tests only
 ./scripts/test.sh unit                  # Unit tests only
-
-# Client
-npm run start:simpleClient              # Start interactive CLI client
 ```
 
 ## Architecture
@@ -43,23 +40,21 @@ npm run start:simpleClient              # Start interactive CLI client
 
 **index.ts** — Defines `McpToolDefinition` interface: each tool is a data structure describing an API endpoint (name, method, pathTemplate, inputSchema as JSON Schema, executionParameters for parameter binding, securityRequirements).
 
-**courses.ts / classrooms.ts** — Tool definition maps (`Map<string, McpToolDefinition>`) for Docebo API endpoints. Adding new tools means creating a new map file and registering it in hono-index.ts.
-
-### Client (`src/client/`)
-
-**simpleStreamableHttpClient.ts** — Interactive REPL client with commands: connect, disconnect, list-tools, call-tool, set-token. Manages sessions with resumption tokens.
+**courses.ts / enrollments.ts / users.ts / notifications.ts** — Tool definition maps (`Map<string, McpToolDefinition>`) for Docebo API endpoints. Adding new tools means creating a new map file and registering it in core.ts.
 
 ### Key Patterns
 
 - **Tool definitions are data, not code** — Each tool is a declarative object with JSON Schema, HTTP method, path template, and parameter bindings. The execution engine in hono-index.ts is generic.
-- **Security credentials from env vars** — Naming convention: `BEARER_TOKEN_{SCHEME}`, `API_KEY_{SCHEME}`, `BASIC_USERNAME_{SCHEME}`, `BASIC_PASSWORD_{SCHEME}`. Scheme names are uppercased with non-alphanumeric chars replaced by underscores (e.g., `bearerAuth` → `BEARERAUTH`).
+- **Bearer token flow** — Tokens flow through the call chain, never via global env vars. HTTP transport: token comes from `extra.authInfo` (set by the auth middleware). Stdio transport: token comes from the `getAccessToken` callback (OAuth password grant). Both paths pass the token directly to `executeApiTool`.
 - **JSON Schema → Zod validation** — Tool input schemas are JSON Schema objects; at runtime they're converted to Zod schemas via `json-schema-to-zod` for argument validation before API calls.
-- **Session management** — Each MCP client connection gets a session tracked by UUID in the `mcp-session-id` HTTP header, with a `StreamableHTTPServerTransport` per session.
+- **Session management** — Each MCP client connection gets its own `Server` instance (via factory function) and `StreamableHTTPServerTransport`, tracked by UUID in the `mcp-session-id` HTTP header.
 
 ## Environment Variables
 
-Required: `BEARER_TOKEN_BEARERAUTH` — Bearer token for Docebo API authentication.
-Optional: `PORT` (default 3000), `LOG_LEVEL` (default info), `API_BASE_URL`.
+Required: `API_BASE_URL` — Docebo instance URL (e.g. `https://mycompany.docebosaas.com`).
+Stdio transport: `DOCEBO_CLIENT_ID`, `DOCEBO_CLIENT_SECRET`, `DOCEBO_USERNAME`, `DOCEBO_PASSWORD`.
+HTTP transport (OAuth): `MCP_SERVER_URL` (public URL), optionally `DOCEBO_CLIENT_ID`/`DOCEBO_CLIENT_SECRET` for token proxy.
+Optional: `PORT` (default 3000).
 
 ## Tech Stack
 

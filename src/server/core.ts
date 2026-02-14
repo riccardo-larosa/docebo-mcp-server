@@ -64,21 +64,6 @@ export const securitySchemes = {
 };
 
 /**
- * Type definition for cached OAuth tokens
- */
-export interface TokenCacheEntry {
-  token: string;
-  expiresAt: number;
-}
-
-/**
- * Declare global __oauthTokenCache property for TypeScript
- */
-declare global {
-  var __oauthTokenCache: Record<string, TokenCacheEntry> | undefined;
-}
-
-/**
  * Options for creating a server instance
  */
 export interface CreateServerOptions {
@@ -141,18 +126,15 @@ export function createServer(options?: CreateServerOptions): Server {
       console.error(`Error: Unknown tool requested: ${toolName}`);
       return { content: [{ type: "text", text: `Error: Unknown tool requested: ${toolName}` }], isError: true };
     }
-    console.error(`Executing tool "${toolName}" with arguments ${JSON.stringify(toolArgs)} and securitySchemes ${JSON.stringify(securitySchemes)}`);
+    console.error(`Executing tool "${toolName}" with arguments ${JSON.stringify(toolArgs)}`);
 
-    // Resolve the bearer token: prefer authInfo from the transport (OAuth resource
-    // server flow), then try the dynamic token provider (stdio OAuth flow), and
-    // finally fall back to the env var (set externally).
-    const authToken = extra?.authInfo?.token;
+    // Resolve the bearer token: prefer authInfo from the transport (OAuth
+    // resource server flow), then try the dynamic token provider (stdio
+    // OAuth flow).
+    let authToken = extra?.authInfo?.token;
 
     if (!authToken && options?.getAccessToken) {
-      const token = await options.getAccessToken();
-      if (token) {
-        process.env.BEARER_TOKEN_BEARERAUTH = token;
-      }
+      authToken = await options.getAccessToken();
     }
 
     // Class-based tools handle their own validation and execution
@@ -160,7 +142,7 @@ export function createServer(options?: CreateServerOptions): Server {
       return entry.handleRequest(toolArgs ?? {});
     }
 
-    return await executeApiTool(toolName, entry, toolArgs ?? {}, securitySchemes, authToken);
+    return await executeApiTool(toolName, entry, toolArgs ?? {}, authToken);
   });
 
   return server;
@@ -173,7 +155,6 @@ async function executeApiTool(
   toolName: string,
   definition: McpToolDefinition,
   toolArgs: JsonObject,
-  allSecuritySchemes: Record<string, any>,
   bearerToken?: string
 ): Promise<CallToolResult> {
   try {
@@ -194,7 +175,7 @@ async function executeApiTool(
     }
 
     // Prepare URL, query parameters, headers, and request body
-    const apiBaseUrl = process.env.API_BASE_URL;
+    const apiBaseUrl = API_BASE_URL;
     let urlPath = definition.pathTemplate;
     const queryParams: Record<string, any> = {};
     const headers: Record<string, string> = { 'Accept': 'application/json' };
@@ -233,79 +214,12 @@ async function executeApiTool(
       headers['content-type'] = definition.requestBodyContentType;
     }
 
-    // Apply security requirements if available
-    const appliedSecurity = definition.securityRequirements?.find(req => {
-      return Object.entries(req).every(([schemeName, scopesArray]) => {
-        const scheme = allSecuritySchemes[schemeName];
-        if (!scheme) return false;
-
-        if (scheme.type === 'apiKey') {
-          return !!process.env[`API_KEY_${schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`];
-        }
-
-        if (scheme.type === 'http') {
-          if (scheme.scheme?.toLowerCase() === 'bearer') {
-            return !!process.env[`BEARER_TOKEN_${schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`];
-          }
-          else if (scheme.scheme?.toLowerCase() === 'basic') {
-            return !!process.env[`BASIC_USERNAME_${schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`] &&
-              !!process.env[`BASIC_PASSWORD_${schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`];
-          }
-        }
-
-        return false;
-      });
-    });
-
-    // If we found matching security scheme(s), apply them
-    if (appliedSecurity) {
-      for (const [schemeName, scopesArray] of Object.entries(appliedSecurity)) {
-        const scheme = allSecuritySchemes[schemeName];
-
-        if (scheme?.type === 'apiKey') {
-          const apiKey = process.env[`API_KEY_${schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`];
-          if (apiKey) {
-            if (scheme.in === 'header') {
-              headers[scheme.name.toLowerCase()] = apiKey;
-              console.error(`Applied API key '${schemeName}' in header '${scheme.name}'`);
-            }
-            else if (scheme.in === 'query') {
-              queryParams[scheme.name] = apiKey;
-              console.error(`Applied API key '${schemeName}' in query parameter '${scheme.name}'`);
-            }
-            else if (scheme.in === 'cookie') {
-              headers['cookie'] = `${scheme.name}=${apiKey}${headers['cookie'] ? `; ${headers['cookie']}` : ''}`;
-              console.error(`Applied API key '${schemeName}' in cookie '${scheme.name}'`);
-            }
-          }
-        }
-        else if (scheme?.type === 'http') {
-          if (scheme.scheme?.toLowerCase() === 'bearer') {
-            const token = bearerToken || process.env[`BEARER_TOKEN_${schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`];
-
-            if (token) {
-              headers['authorization'] = `Bearer ${token}`;
-              console.error(`Applied Bearer token for '${schemeName}'`);
-            }
-          }
-        }
-      }
-    }
-    else if (definition.securityRequirements?.length > 0) {
-      const securityRequirementsString = definition.securityRequirements
-        .map(req => {
-          const parts = Object.entries(req)
-            .map(([name, scopesArray]) => {
-              const scopes = scopesArray as string[];
-              if (scopes.length === 0) return name;
-              return `${name} (scopes: ${scopes.join(', ')})`;
-            })
-            .join(' AND ');
-          return `[${parts}]`;
-        })
-        .join(' OR ');
-
-      console.warn(`Tool '${toolName}' requires security: ${securityRequirementsString}, but no suitable credentials found.`);
+    // Apply bearer token if available (from OAuth authInfo or getAccessToken)
+    if (bearerToken) {
+      headers['authorization'] = `Bearer ${bearerToken}`;
+      console.error(`Applied Bearer token for outbound API call`);
+    } else if (definition.securityRequirements?.length > 0) {
+      console.warn(`Tool '${toolName}' requires authentication, but no bearer token available.`);
     }
 
     // Prepare the axios request configuration

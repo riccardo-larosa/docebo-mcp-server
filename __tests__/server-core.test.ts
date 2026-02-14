@@ -39,14 +39,12 @@ describe('Server Core — createServer()', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     registeredHandlers.clear();
-    process.env.BEARER_TOKEN_BEARERAUTH = 'test-token-123';
     process.env.API_BASE_URL = 'https://example.docebosaas.com';
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    delete process.env.BEARER_TOKEN_BEARERAUTH;
     delete process.env.API_BASE_URL;
     vi.restoreAllMocks();
   });
@@ -175,10 +173,11 @@ describe('Server Core — GetPrompt handler', () => {
 describe('Server Core — CallTool handler', () => {
   let callToolHandler: Function;
 
+  const authExtra = { authInfo: { token: 'test-token-123' } };
+
   beforeEach(() => {
     vi.clearAllMocks();
     registeredHandlers.clear();
-    process.env.BEARER_TOKEN_BEARERAUTH = 'test-token-123';
     process.env.API_BASE_URL = 'https://example.docebosaas.com';
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -187,7 +186,6 @@ describe('Server Core — CallTool handler', () => {
   });
 
   afterEach(() => {
-    delete process.env.BEARER_TOKEN_BEARERAUTH;
     delete process.env.API_BASE_URL;
     vi.restoreAllMocks();
   });
@@ -209,7 +207,7 @@ describe('Server Core — CallTool handler', () => {
 
     const result = await callToolHandler({
       params: { name: 'list-all-courses', arguments: { page: '0', page_size: '10' } },
-    });
+    }, authExtra);
 
     expect(result.isError).toBeUndefined();
     expect(result.content[0].text).toContain('API Response (Status: 200)');
@@ -225,13 +223,13 @@ describe('Server Core — CallTool handler', () => {
 
     const result = await callToolHandler({
       params: { name: 'get-a-course', arguments: { course_id: '42' } },
-    });
+    }, authExtra);
 
     expect(result.isError).toBeUndefined();
 
     // Check that axios was called with the resolved URL
     const axiosCall = mockAxios.mock.calls[0][0];
-    expect(axiosCall.url).toContain('/learn/v1/courses/42');
+    expect(axiosCall.url).toContain('learn/v1/courses/42');
     expect(axiosCall.url).not.toContain('{course_id}');
   });
 
@@ -253,7 +251,7 @@ describe('Server Core — CallTool handler', () => {
     expect(result.content[0].text).toContain('Invalid arguments');
   });
 
-  it('should apply bearer token header', async () => {
+  it('should apply bearer token header from authInfo', async () => {
     mockAxios.mockResolvedValue({
       status: 200,
       headers: { 'content-type': 'application/json' },
@@ -262,7 +260,7 @@ describe('Server Core — CallTool handler', () => {
 
     await callToolHandler({
       params: { name: 'list-all-courses', arguments: {} },
-    });
+    }, authExtra);
 
     const axiosCall = mockAxios.mock.calls[0][0];
     expect(axiosCall.headers.authorization).toBe('Bearer test-token-123');
@@ -404,7 +402,7 @@ describe('Server Core — CallTool handler', () => {
     expect(result.content[0].text).toContain('string error');
   });
 
-  it('should use getAccessToken option when provided', async () => {
+  it('should use getAccessToken option when no authInfo token', async () => {
     registeredHandlers.clear();
     const mockGetToken = vi.fn().mockResolvedValue('dynamic-oauth-token');
     createServer({ getAccessToken: mockGetToken });
@@ -416,27 +414,28 @@ describe('Server Core — CallTool handler', () => {
       data: {},
     });
 
+    // Call without authInfo — should fall back to getAccessToken
     await handler({ params: { name: 'list-all-courses', arguments: {} } });
 
     expect(mockGetToken).toHaveBeenCalledOnce();
-    expect(process.env.BEARER_TOKEN_BEARERAUTH).toBe('dynamic-oauth-token');
+    const axiosCall = mockAxios.mock.calls[0][0];
+    expect(axiosCall.headers.authorization).toBe('Bearer dynamic-oauth-token');
   });
 
-  it('should warn when no security credentials are found', async () => {
-    delete process.env.BEARER_TOKEN_BEARERAUTH;
-
+  it('should warn when no bearer token is available', async () => {
     mockAxios.mockResolvedValue({
       status: 200,
       headers: { 'content-type': 'application/json' },
       data: {},
     });
 
+    // Call without authInfo — no token available
     await callToolHandler({
       params: { name: 'list-all-courses', arguments: {} },
     });
 
     expect(console.warn).toHaveBeenCalledWith(
-      expect.stringContaining('requires security'),
+      expect.stringContaining('requires authentication'),
     );
   });
 
@@ -463,14 +462,14 @@ describe('Server Core — CallTool handler', () => {
 
     const result = await callToolHandler({
       params: { name: 'list-enrollments', arguments: { id_user: '10' } },
-    });
+    }, authExtra);
 
     expect(result.isError).toBeUndefined();
     expect(result.content[0].text).toContain('API Response (Status: 200)');
     expect(result.content[0].text).toContain('completed');
 
     const axiosCall = mockAxios.mock.calls[0][0];
-    expect(axiosCall.url).toContain('/learn/v1/enrollments');
+    expect(axiosCall.url).toContain('learn/v1/enrollments');
     expect(axiosCall.params.id_user).toBe('10');
   });
 
@@ -483,14 +482,14 @@ describe('Server Core — CallTool handler', () => {
 
     const result = await callToolHandler({
       params: { name: 'list-users', arguments: { search_text: 'jdoe' } },
-    });
+    }, authExtra);
 
     expect(result.isError).toBeUndefined();
     expect(result.content[0].text).toContain('API Response (Status: 200)');
     expect(result.content[0].text).toContain('jdoe');
 
     const axiosCall = mockAxios.mock.calls[0][0];
-    expect(axiosCall.url).toContain('/manage/v1/user');
+    expect(axiosCall.url).toContain('manage/v1/user');
     expect(axiosCall.params.search_text).toBe('jdoe');
   });
 
@@ -503,12 +502,12 @@ describe('Server Core — CallTool handler', () => {
 
     const result = await callToolHandler({
       params: { name: 'get-user', arguments: { user_id: '42' } },
-    });
+    }, authExtra);
 
     expect(result.isError).toBeUndefined();
 
     const axiosCall = mockAxios.mock.calls[0][0];
-    expect(axiosCall.url).toContain('/manage/v1/user/42');
+    expect(axiosCall.url).toContain('manage/v1/user/42');
     expect(axiosCall.url).not.toContain('{user_id}');
   });
 });
@@ -642,11 +641,11 @@ describe('Server Core — course-recommendations prompt', () => {
 
 describe('Server Core — list-all-courses search params', () => {
   let callToolHandler: Function;
+  const authExtra = { authInfo: { token: 'test-token-123' } };
 
   beforeEach(() => {
     vi.clearAllMocks();
     registeredHandlers.clear();
-    process.env.BEARER_TOKEN_BEARERAUTH = 'test-token-123';
     process.env.API_BASE_URL = 'https://example.docebosaas.com';
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -655,7 +654,6 @@ describe('Server Core — list-all-courses search params', () => {
   });
 
   afterEach(() => {
-    delete process.env.BEARER_TOKEN_BEARERAUTH;
     delete process.env.API_BASE_URL;
     vi.restoreAllMocks();
   });
@@ -669,7 +667,7 @@ describe('Server Core — list-all-courses search params', () => {
 
     await callToolHandler({
       params: { name: 'list-all-courses', arguments: { search_text: 'compliance' } },
-    });
+    }, authExtra);
 
     const axiosCall = mockAxios.mock.calls[0][0];
     expect(axiosCall.params.search_text).toBe('compliance');
@@ -684,7 +682,7 @@ describe('Server Core — list-all-courses search params', () => {
 
     await callToolHandler({
       params: { name: 'list-all-courses', arguments: { category: 'Safety', status: 'published' } },
-    });
+    }, authExtra);
 
     const axiosCall = mockAxios.mock.calls[0][0];
     expect(axiosCall.params.category).toBe('Safety');
@@ -700,7 +698,7 @@ describe('Server Core — list-all-courses search params', () => {
 
     await callToolHandler({
       params: { name: 'list-all-courses', arguments: { sort_by: 'name', sort_order: 'asc' } },
-    });
+    }, authExtra);
 
     const axiosCall = mockAxios.mock.calls[0][0];
     expect(axiosCall.params.sort_by).toBe('name');
@@ -716,7 +714,7 @@ describe('Server Core — list-all-courses search params', () => {
 
     await callToolHandler({
       params: { name: 'list-all-courses', arguments: { page: '0' } },
-    });
+    }, authExtra);
 
     const axiosCall = mockAxios.mock.calls[0][0];
     expect(axiosCall.params.page).toBe('0');
