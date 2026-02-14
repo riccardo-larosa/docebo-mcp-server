@@ -134,7 +134,7 @@ export function createServer(options?: CreateServerOptions): Server {
     return { tools: toolsForClient };
   });
 
-  server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest, context?: any): Promise<CallToolResult> => {
+  server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest, extra?: any): Promise<CallToolResult> => {
     const { name: toolName, arguments: toolArgs } = request.params;
     const entry = toolDefinitionMap.get(toolName);
     if (!entry) {
@@ -143,8 +143,12 @@ export function createServer(options?: CreateServerOptions): Server {
     }
     console.error(`Executing tool "${toolName}" with arguments ${JSON.stringify(toolArgs)} and securitySchemes ${JSON.stringify(securitySchemes)}`);
 
-    // If a dynamic token provider is configured, resolve the token and set it in env
-    if (options?.getAccessToken) {
+    // Resolve the bearer token: prefer authInfo from the transport (OAuth resource
+    // server flow), then try the dynamic token provider (stdio OAuth flow), and
+    // finally fall back to the env var (set externally).
+    const authToken = extra?.authInfo?.token;
+
+    if (!authToken && options?.getAccessToken) {
       const token = await options.getAccessToken();
       if (token) {
         process.env.BEARER_TOKEN_BEARERAUTH = token;
@@ -156,7 +160,7 @@ export function createServer(options?: CreateServerOptions): Server {
       return entry.handleRequest(toolArgs ?? {});
     }
 
-    return await executeApiTool(toolName, entry, toolArgs ?? {}, securitySchemes, context?.bearerToken);
+    return await executeApiTool(toolName, entry, toolArgs ?? {}, securitySchemes, authToken);
   });
 
   return server;

@@ -1,4 +1,4 @@
-import { setupStreamableHttpServer } from "./hono-server.js";
+import { setupStreamableHttpServer, type OAuthResourceConfig } from "./hono-server.js";
 import { createServer, SERVER_NAME, SERVER_VERSION } from "./core.js";
 
 import dotenv from 'dotenv';
@@ -26,7 +26,18 @@ async function cleanup() {
  */
 async function main() {
   try {
-    await setupStreamableHttpServer(server, 3000);
+    // Build OAuth resource server config when both env vars are set
+    let oauthConfig: OAuthResourceConfig | undefined;
+    const mcpServerUrl = process.env.MCP_SERVER_URL;
+    const authServerUrl = process.env.DOCEBO_AUTH_SERVER_URL || process.env.API_BASE_URL;
+
+    if (mcpServerUrl && authServerUrl) {
+      oauthConfig = { mcpServerUrl, authorizationServerUrl: authServerUrl };
+      console.error(`OAuth resource server enabled — AS: ${authServerUrl}`);
+    }
+
+    const port = parseInt(process.env.PORT || '3000', 10);
+    await setupStreamableHttpServer(server, port, oauthConfig);
   } catch (error) {
     console.error("Error setting up StreamableHTTP server:", error);
     process.exit(1);
