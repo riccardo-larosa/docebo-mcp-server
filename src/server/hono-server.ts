@@ -28,6 +28,10 @@ export interface OAuthResourceConfig {
   mcpServerUrl: string;
   /** Docebo instance URL acting as the OAuth authorization server */
   authorizationServerUrl: string;
+  /** OAuth client ID registered in Docebo */
+  clientId?: string;
+  /** OAuth client secret — needed to proxy the token exchange for public MCP clients */
+  clientSecret?: string;
 }
 
 /**
@@ -40,16 +44,22 @@ type HonoEnv = {
 };
 
 /**
- * StreamableHTTP MCP Server handler
+ * StreamableHTTP MCP Server handler.
+ *
+ * Each MCP session needs its own Server instance (the SDK binds one transport
+ * per Server). We accept a factory function that creates a fresh Server for
+ * every new session while reusing the same tool/prompt registration logic.
  */
 class MCPStreamableHttpServer {
-  server: Server;
+  private serverFactory: () => Server;
   // Store active transports by session ID
   transports: {[sessionId: string]: StreamableHTTPServerTransport} = {};
+  // Store per-session Server instances so they can be cleaned up
+  private servers: {[sessionId: string]: Server} = {};
   sessionTokens: {[sessionId: string]: string} = {};
-  
-  constructor(server: Server) {
-    this.server = server;
+
+  constructor(serverFactory: () => Server) {
+    this.serverFactory = serverFactory;
   }
   
   /**
@@ -113,8 +123,9 @@ class MCPStreamableHttpServer {
           console.error('StreamableHTTP transport error:', err);
         };
         
-        // Connect the transport to the MCP server
-        await this.server.connect(transport);
+        // Create a fresh Server instance for this session and connect it
+        const sessionServer = this.serverFactory();
+        await sessionServer.connect(transport);
         
         // Handle the request with the transport
         await transport.handleRequest(req, res, body);
@@ -124,11 +135,13 @@ class MCPStreamableHttpServer {
         if (newSessionId) {
           console.error(`New session established: ${newSessionId}`);
           this.transports[newSessionId] = transport;
-          
+          this.servers[newSessionId] = sessionServer;
+
           // Set up clean-up for when the transport is closed
           transport.onclose = () => {
             console.error(`Session closed: ${newSessionId}`);
             delete this.transports[newSessionId];
+            delete this.servers[newSessionId];
           };
         }
         
@@ -193,12 +206,12 @@ class MCPStreamableHttpServer {
 /**
  * Sets up a web server for the MCP server using StreamableHTTP transport
  *
- * @param server The MCP Server instance
+ * @param serverFactory Factory function that creates a new MCP Server instance per session
  * @param port The port to listen on (default: 3000)
  * @param oauthConfig Optional OAuth resource server configuration
  * @returns The Hono app instance
  */
-export async function setupStreamableHttpServer(server: Server, port = 3000, oauthConfig?: OAuthResourceConfig) {
+export async function setupStreamableHttpServer(serverFactory: () => Server, port = 3000, oauthConfig?: OAuthResourceConfig) {
   // Create Hono app
   const app = new Hono<HonoEnv>();
 
@@ -206,7 +219,7 @@ export async function setupStreamableHttpServer(server: Server, port = 3000, oau
   app.use('*', cors());
 
   // Create MCP handler
-  const mcpHandler = new MCPStreamableHttpServer(server);
+  const mcpHandler = new MCPStreamableHttpServer(serverFactory);
 
   // Add a simple health check endpoint
   app.get('/health', (c) => {
@@ -220,14 +233,26 @@ export async function setupStreamableHttpServer(server: Server, port = 3000, oau
     const authServerBase = oauthConfig.authorizationServerUrl.replace(/\/+$/, '');
 
     // RFC 9728 — Protected Resource Metadata
+    // Point authorization_servers at ourselves so that MCP clients fetch
+    // our /.well-known/oauth-authorization-server (which proxies/redirects
+    // to the real Docebo endpoints). Docebo doesn't serve RFC 8414 metadata.
     app.get('/.well-known/oauth-protected-resource', (c) => {
       return c.json({
         resource: oauthConfig.mcpServerUrl,
-        authorization_servers: [oauthConfig.authorizationServerUrl],
+        authorization_servers: [mcpBase],
         scopes_supported: ['api'],
         bearer_methods_supported: ['header'],
       });
     });
+
+    // Determine the token endpoint: proxy through our server when we have
+    // client credentials (so public MCP clients don't need the secret),
+    // otherwise point directly at Docebo.
+    const mcpBase = oauthConfig.mcpServerUrl.replace(/\/+$/, '');
+    const useTokenProxy = !!(oauthConfig.clientId && oauthConfig.clientSecret);
+    const tokenEndpoint = useTokenProxy
+      ? `${mcpBase}/oauth/token`
+      : `${authServerBase}/oauth2/token`;
 
     // RFC 8414 — Authorization Server Metadata
     // Served here because Docebo doesn't publish its own AS metadata.
@@ -236,13 +261,46 @@ export async function setupStreamableHttpServer(server: Server, port = 3000, oau
       return c.json({
         issuer: oauthConfig.authorizationServerUrl,
         authorization_endpoint: `${authServerBase}/oauth2/authorize`,
-        token_endpoint: `${authServerBase}/oauth2/token`,
+        token_endpoint: tokenEndpoint,
         response_types_supported: ['code'],
         grant_types_supported: ['authorization_code'],
         code_challenge_methods_supported: ['S256'],
         scopes_supported: ['api'],
       });
     });
+
+    // Token proxy — accepts token requests from public MCP clients (no
+    // client_secret), injects the Docebo client credentials, and forwards
+    // the request to Docebo's token endpoint.
+    if (useTokenProxy) {
+      app.post('/oauth/token', async (c) => {
+        try {
+          const body = await c.req.text();
+          const params = new URLSearchParams(body);
+
+          // Inject confidential client credentials
+          params.set('client_id', oauthConfig.clientId!);
+          params.set('client_secret', oauthConfig.clientSecret!);
+
+          console.error(`Token proxy: forwarding ${params.get('grant_type')} request to Docebo`);
+
+          const upstream = await fetch(`${authServerBase}/oauth2/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString(),
+          });
+
+          const responseBody = await upstream.text();
+          return new Response(responseBody, {
+            status: upstream.status,
+            headers: { 'Content-Type': upstream.headers.get('Content-Type') || 'application/json' },
+          });
+        } catch (err) {
+          console.error('Token proxy error:', err);
+          return c.json({ error: 'server_error', error_description: 'Token proxy failed' }, 500);
+        }
+      });
+    }
 
     // Bearer auth middleware for /mcp routes
     app.use('/mcp', async (c, next) => {

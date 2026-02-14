@@ -9,11 +9,6 @@ dotenv.config();
 export { SERVER_NAME, SERVER_VERSION };
 
 /**
- * MCP Server instance using shared core logic
- */
-const server = createServer();
-
-/**
  * Cleanup function for graceful shutdown
  */
 async function cleanup() {
@@ -32,12 +27,20 @@ async function main() {
     const authServerUrl = process.env.DOCEBO_AUTH_SERVER_URL || process.env.API_BASE_URL;
 
     if (mcpServerUrl && authServerUrl) {
-      oauthConfig = { mcpServerUrl, authorizationServerUrl: authServerUrl };
+      oauthConfig = {
+        mcpServerUrl,
+        authorizationServerUrl: authServerUrl,
+        clientId: process.env.DOCEBO_CLIENT_ID,
+        clientSecret: process.env.DOCEBO_CLIENT_SECRET,
+      };
       console.error(`OAuth resource server enabled — AS: ${authServerUrl}`);
+      if (oauthConfig.clientId && oauthConfig.clientSecret) {
+        console.error(`Token proxy enabled for client: ${oauthConfig.clientId}`);
+      }
     }
 
     const port = parseInt(process.env.PORT || '3000', 10);
-    await setupStreamableHttpServer(server, port, oauthConfig);
+    await setupStreamableHttpServer(() => createServer(), port, oauthConfig);
   } catch (error) {
     console.error("Error setting up StreamableHTTP server:", error);
     process.exit(1);
