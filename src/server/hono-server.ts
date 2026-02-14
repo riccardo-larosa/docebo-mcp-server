@@ -19,6 +19,27 @@ const SESSION_ID_HEADER_NAME = "mcp-session-id";
 const JSON_RPC = "2.0";
 
 /**
+ * Configuration for the OAuth resource server behavior.
+ * When provided, the server acts as an OAuth 2.0 Protected Resource (RFC 9728)
+ * and requires Bearer tokens on /mcp requests.
+ */
+export interface OAuthResourceConfig {
+  /** Public URL of this MCP server (e.g. "https://mcp.example.com") */
+  mcpServerUrl: string;
+  /** Docebo instance URL acting as the OAuth authorization server */
+  authorizationServerUrl: string;
+}
+
+/**
+ * Hono environment type for typed context variables.
+ */
+type HonoEnv = {
+  Variables: {
+    bearerToken: string;
+  };
+};
+
+/**
  * StreamableHTTP MCP Server handler
  */
 class MCPStreamableHttpServer {
@@ -47,13 +68,20 @@ class MCPStreamableHttpServer {
   async handlePostRequest(c: any) {
     const sessionId = c.req.header(SESSION_ID_HEADER_NAME);
     console.error(`POST request received ${sessionId ? 'with session ID: ' + sessionId : 'without session ID'}`);
-    
+
     try {
       const body = await c.req.json();
       console.log(`Body: ${JSON.stringify(body)}`);
-      
+
       // Convert Fetch Request to Node.js req/res
       const { req, res } = toReqRes(c.req.raw);
+
+      // If the auth middleware stored a bearer token, attach AuthInfo to the
+      // Node.js request so the SDK propagates it as extra.authInfo to handlers.
+      const bearerToken: string | undefined = c.get('bearerToken');
+      if (bearerToken) {
+        (req as any).auth = { token: bearerToken, clientId: 'oauth', scopes: ['api'] };
+      }
       
       // Reuse existing transport if we have a session ID
       if (sessionId && this.transports[sessionId]) {
@@ -164,26 +192,63 @@ class MCPStreamableHttpServer {
 
 /**
  * Sets up a web server for the MCP server using StreamableHTTP transport
- * 
+ *
  * @param server The MCP Server instance
  * @param port The port to listen on (default: 3000)
+ * @param oauthConfig Optional OAuth resource server configuration
  * @returns The Hono app instance
  */
-export async function setupStreamableHttpServer(server: Server, port = 3000) {
+export async function setupStreamableHttpServer(server: Server, port = 3000, oauthConfig?: OAuthResourceConfig) {
   // Create Hono app
-  const app = new Hono();
-  
+  const app = new Hono<HonoEnv>();
+
   // Enable CORS
   app.use('*', cors());
-  
+
   // Create MCP handler
   const mcpHandler = new MCPStreamableHttpServer(server);
-  
+
   // Add a simple health check endpoint
   app.get('/health', (c) => {
     return c.json({ status: 'OK', server: SERVER_NAME, version: SERVER_VERSION });
   });
-  
+
+  // --- OAuth 2.0 Protected Resource metadata & auth middleware ---
+  if (oauthConfig) {
+    const resourceMetadataUrl = `${oauthConfig.mcpServerUrl.replace(/\/+$/, '')}/.well-known/oauth-protected-resource`;
+
+    // RFC 9728 — Protected Resource Metadata
+    app.get('/.well-known/oauth-protected-resource', (c) => {
+      return c.json({
+        resource: oauthConfig.mcpServerUrl,
+        authorization_servers: [oauthConfig.authorizationServerUrl],
+        scopes_supported: ['api'],
+        bearer_methods_supported: ['header'],
+      });
+    });
+
+    // Bearer auth middleware for /mcp routes
+    app.use('/mcp', async (c, next) => {
+      const authHeader = c.req.header('Authorization');
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return c.text('Unauthorized', 401, {
+          'WWW-Authenticate': `Bearer resource_metadata="${resourceMetadataUrl}"`,
+        });
+      }
+
+      const token = authHeader.slice('Bearer '.length);
+      if (!token) {
+        return c.text('Unauthorized', 401, {
+          'WWW-Authenticate': `Bearer resource_metadata="${resourceMetadataUrl}"`,
+        });
+      }
+
+      // Store the token so the MCP handler can pass it to tool execution
+      c.set('bearerToken', token);
+      await next();
+    });
+  }
+
   // Main MCP endpoint supporting both GET and POST
   app.get("/mcp", (c) => mcpHandler.handleGetRequest(c));
   app.post("/mcp", (c) => mcpHandler.handlePostRequest(c));
