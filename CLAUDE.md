@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MCP (Model Context Protocol) server that bridges Claude/MCP clients to the Docebo Learning Platform API. Uses StreamableHTTP transport over Hono, with tool definitions that translate to Docebo REST API calls. Includes an interactive CLI client for testing.
+Remote MCP (Model Context Protocol) server that bridges Claude/MCP clients to the Docebo Learning Platform API. Uses StreamableHTTP transport over Hono with OAuth 2.0 authentication. Tool definitions translate to Docebo REST API calls.
 
 ## Commands
 
@@ -14,6 +14,9 @@ npm run build                           # Compile TypeScript to ./build
 
 # Dev (auto-rebuild on changes)
 npm run dev:hono                        # Start server with tsc-watch
+
+# Start (production)
+npm start                               # Start built server
 
 # Test
 npm test                                # Run all tests
@@ -28,9 +31,12 @@ npm run coverage                        # Run tests with coverage report
 
 ### Server (`src/server/`)
 
-**hono-index.ts** — Core MCP server logic. Creates the MCP Server instance and registers two protocol handlers:
-- `ListToolsRequestSchema` — Returns available tools from all tool maps
-- `CallToolRequestSchema` — Executes a tool by: validating args against auto-generated Zod schemas (from JSON Schema via `json-schema-to-zod`), binding path/query/header parameters to the URL template, applying security credentials from environment variables, and making the HTTP request via axios.
+**hono-index.ts** — Entry point. Configures OAuth resource server settings and starts the HTTP server.
+
+**core.ts** — Creates the MCP Server instance and registers protocol handlers:
+- `ListToolsRequestSchema` / `ListPromptsRequestSchema` — Returns available tools/prompts
+- `CallToolRequestSchema` — Executes a tool by: validating args against Zod schemas, binding path/query/header parameters to the URL template, applying the bearer token from OAuth, and making the HTTP request via axios.
+- `GetPromptRequestSchema` — Returns prompt messages with argument interpolation.
 
 **hono-server.ts** — HTTP transport layer. `MCPStreamableHttpServer` class wraps Hono to manage MCP sessions tracked via `mcp-session-id` header. Endpoints: `POST /mcp` (all MCP requests), `GET /health` (health check).
 
@@ -44,17 +50,14 @@ npm run coverage                        # Run tests with coverage report
 
 ### Key Patterns
 
-- **Tool definitions are data, not code** — Each tool is a declarative object with JSON Schema, HTTP method, path template, and parameter bindings. The execution engine in hono-index.ts is generic.
-- **Bearer token flow** — Tokens flow through the call chain, never via global env vars. HTTP transport: token comes from `extra.authInfo` (set by the auth middleware). Stdio transport: token comes from the `getAccessToken` callback (OAuth password grant). Both paths pass the token directly to `executeApiTool`.
-- **JSON Schema → Zod validation** — Tool input schemas are JSON Schema objects; at runtime they're converted to Zod schemas via `json-schema-to-zod` for argument validation before API calls.
+- **Tool definitions are data, not code** — Each tool is a declarative object with JSON Schema, HTTP method, path template, and parameter bindings. The execution engine in core.ts is generic.
+- **Bearer token flow** — Token comes from `extra.authInfo` (set by the OAuth auth middleware) and is passed directly to `executeApiTool`. No env var token storage.
 - **Session management** — Each MCP client connection gets its own `Server` instance (via factory function) and `StreamableHTTPServerTransport`, tracked by UUID in the `mcp-session-id` HTTP header.
 
 ## Environment Variables
 
-Required: `API_BASE_URL` — Docebo instance URL (e.g. `https://mycompany.docebosaas.com`).
-Stdio transport: `DOCEBO_CLIENT_ID`, `DOCEBO_CLIENT_SECRET`, `DOCEBO_USERNAME`, `DOCEBO_PASSWORD`.
-HTTP transport (OAuth): `MCP_SERVER_URL` (public URL), optionally `DOCEBO_CLIENT_ID`/`DOCEBO_CLIENT_SECRET` for token proxy.
-Optional: `PORT` (default 3000).
+Required: `API_BASE_URL` — Docebo instance URL, `MCP_SERVER_URL` — public URL of this server.
+Optional: `DOCEBO_CLIENT_ID`/`DOCEBO_CLIENT_SECRET` (enables token proxy for public MCP clients), `PORT` (default 3000).
 
 ## Tech Stack
 

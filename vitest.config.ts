@@ -12,7 +12,6 @@ export default defineConfig({
       include: ['src/**/*.ts'], // Files to include in coverage
       exclude: [ // Files/patterns to exclude
           'src/server/hono-index.ts',
-          'src/server/stdio-index.ts',
           'src/types.ts',
           '**/*.d.ts',
        ],

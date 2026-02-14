@@ -6,55 +6,41 @@ An [MCP](https://modelcontextprotocol.io/) (Model Context Protocol) server that 
 
 [MCP](https://modelcontextprotocol.io/) is an open standard that lets AI models interact with external tools and data through a consistent interface. This server gives any MCP-compatible client (Claude Desktop, Claude Code, Cursor, and [others](https://modelcontextprotocol.io/clients)) the ability to read and manage your Docebo learning platform.
 
-## Quick Start
-
-```bash
-# Run directly with npx (no install needed)
-npx -y docebo-mcp-server
-
-# Or install globally
-npm install -g docebo-mcp-server
-docebo-mcp-server
-```
-
 ## Prerequisites
 
 - Node.js >= 18
-- A Docebo platform instance with API credentials (OAuth client ID/secret + user credentials)
+- A Docebo platform instance with API credentials (OAuth client ID/secret)
+- A publicly accessible URL for the server (e.g. via a cloud provider or tunnel)
 
 ## Setup
 
-### Claude Desktop
-
-Add the following to your Claude Desktop config file (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
-
-```json
-{
-  "mcpServers": {
-    "docebo": {
-      "command": "npx",
-      "args": ["-y", "docebo-mcp-server"],
-      "env": {
-        "API_BASE_URL": "https://your-instance.docebosaas.com",
-        "DOCEBO_CLIENT_ID": "your-client-id",
-        "DOCEBO_CLIENT_SECRET": "your-client-secret",
-        "DOCEBO_USERNAME": "your-username",
-        "DOCEBO_PASSWORD": "your-password"
-      }
-    }
-  }
-}
-```
-
-Restart Claude Desktop after saving. The server will appear in the tools menu.
-
-### Claude Code
+### 1. Deploy the server
 
 ```bash
-claude mcp add docebo -- npx -y docebo-mcp-server
+git clone https://github.com/riccardo-larosa/docebo-mcp-server.git
+cd docebo-mcp-server
+npm install && npm run build
 ```
 
-Then set the required environment variables in your shell before launching Claude Code, or use a `.env`-style approach supported by your shell.
+Configure environment variables (see below) and start:
+
+```bash
+npm start
+```
+
+### 2. Connect Claude Desktop
+
+Add a remote MCP server in Claude Desktop settings:
+
+- **URL:** `https://your-server-url.example.com/mcp`
+
+Claude Desktop will handle OAuth authorization automatically via the server's discovery endpoints.
+
+### 3. Connect Claude Code
+
+```bash
+claude mcp add docebo --transport http https://your-server-url.example.com/mcp
+```
 
 ## Example Usage
 
@@ -121,19 +107,12 @@ Once set up, try these example prompts:
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `API_BASE_URL` | Yes | Your Docebo instance URL (e.g., `https://your-instance.docebosaas.com`) |
-| `DOCEBO_CLIENT_ID` | stdio | OAuth client ID |
-| `DOCEBO_CLIENT_SECRET` | stdio | OAuth client secret |
-| `DOCEBO_USERNAME` | stdio | Docebo username for OAuth password grant |
-| `DOCEBO_PASSWORD` | stdio | Docebo password for OAuth password grant |
-| `MCP_SERVER_URL` | HTTP | Public URL of this server (enables OAuth resource server) |
+| `MCP_SERVER_URL` | Yes | Public URL of this server (enables OAuth resource server) |
+| `DOCEBO_CLIENT_ID` | No | OAuth client ID (enables token proxy for public MCP clients) |
+| `DOCEBO_CLIENT_SECRET` | No | OAuth client secret (enables token proxy for public MCP clients) |
 | `PORT` | No | Server port (default: 3000) |
-| `LOG_LEVEL` | No | Log level (default: info) |
 
 ## Development
-
-### HTTP Server
-
-The server also supports Streamable HTTP transport for remote/web clients:
 
 ```bash
 npm run dev:hono
@@ -166,26 +145,20 @@ Use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector):
 npx @modelcontextprotocol/inspector
 ```
 
-Or the built-in CLI client:
-
-```bash
-npm run start:simpleClient
-```
-
 ### Architecture
 
 ```mermaid
 graph LR
     subgraph "Your Computer"
-        C1[MCP Host w/ Client]
-        S1[MCP Server]
+        C1[MCP Client]
     end
 
-    subgraph "Remote Servers"
+    subgraph "Remote"
+        S1[MCP Server]
         API1[Docebo API]
     end
 
-    C1 <--> S1
+    C1 <-->|HTTP + OAuth| S1
     S1 <--> API1
 
   style C1 fill:#2e7d32,color:#ffffff

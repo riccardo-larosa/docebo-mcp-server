@@ -402,26 +402,6 @@ describe('Server Core — CallTool handler', () => {
     expect(result.content[0].text).toContain('string error');
   });
 
-  it('should use getAccessToken option when no authInfo token', async () => {
-    registeredHandlers.clear();
-    const mockGetToken = vi.fn().mockResolvedValue('dynamic-oauth-token');
-    createServer({ getAccessToken: mockGetToken });
-    const handler = registeredHandlers.get(CallToolRequestSchema)!;
-
-    mockAxios.mockResolvedValue({
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-      data: {},
-    });
-
-    // Call without authInfo — should fall back to getAccessToken
-    await handler({ params: { name: 'list-all-courses', arguments: {} } });
-
-    expect(mockGetToken).toHaveBeenCalledOnce();
-    const axiosCall = mockAxios.mock.calls[0][0];
-    expect(axiosCall.headers.authorization).toBe('Bearer dynamic-oauth-token');
-  });
-
   it('should warn when no bearer token is available', async () => {
     mockAxios.mockResolvedValue({
       status: 200,

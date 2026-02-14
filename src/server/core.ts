@@ -64,20 +64,11 @@ export const securitySchemes = {
 };
 
 /**
- * Options for creating a server instance
- */
-export interface CreateServerOptions {
-  /** Optional callback to resolve the bearer token dynamically (e.g. via OAuth) */
-  getAccessToken?: () => Promise<string | undefined>;
-}
-
-/**
  * Creates and configures an MCP Server instance with tool handlers.
  *
- * @param options Optional configuration
  * @returns Configured Server instance
  */
-export function createServer(options?: CreateServerOptions): Server {
+export function createServer(): Server {
   const server = new Server(
     { name: SERVER_NAME, version: SERVER_VERSION },
     { capabilities: { tools: {}, prompts: {} } }
@@ -128,14 +119,8 @@ export function createServer(options?: CreateServerOptions): Server {
     }
     console.error(`Executing tool "${toolName}" with arguments ${JSON.stringify(toolArgs)}`);
 
-    // Resolve the bearer token: prefer authInfo from the transport (OAuth
-    // resource server flow), then try the dynamic token provider (stdio
-    // OAuth flow).
-    let authToken = extra?.authInfo?.token;
-
-    if (!authToken && options?.getAccessToken) {
-      authToken = await options.getAccessToken();
-    }
+    // Resolve the bearer token from the transport (OAuth resource server flow)
+    const authToken = extra?.authInfo?.token;
 
     // Class-based tools handle their own validation and execution
     if (entry instanceof BaseTool) {
@@ -214,7 +199,7 @@ async function executeApiTool(
       headers['content-type'] = definition.requestBodyContentType;
     }
 
-    // Apply bearer token if available (from OAuth authInfo or getAccessToken)
+    // Apply bearer token if available (from OAuth authInfo)
     if (bearerToken) {
       headers['authorization'] = `Bearer ${bearerToken}`;
       console.error(`Applied Bearer token for outbound API call`);
