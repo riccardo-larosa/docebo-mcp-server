@@ -111,17 +111,23 @@ describe('Course Enrollment Report Prompt', () => {
     await import('../src/server/prompts/courseEnrollmentReport.js');
   });
 
-  it('should generate correct messages without course_name', () => {
-    const messages = getPromptMessages('course-enrollment-report', {});
+  it('should require user_ids argument', () => {
+    expect(() => getPromptMessages('course-enrollment-report', {})).toThrow('Missing required argument: user_ids');
+  });
+
+  it('should generate correct messages with user_ids', () => {
+    const messages = getPromptMessages('course-enrollment-report', { user_ids: '123, 456' });
     expect(messages).toHaveLength(1);
     expect(messages[0].role).toBe('user');
-    expect(messages[0].content.text).toContain('list-all-courses');
-    expect(messages[0].content.text).toContain('get-a-course');
-    expect(messages[0].content.text).toContain('Include all available courses');
+    expect(messages[0].content.text).toContain('get-user-progress');
+    expect(messages[0].content.text).toContain('get-enrollment-details');
+    expect(messages[0].content.text).toContain('123');
+    expect(messages[0].content.text).toContain('456');
+    expect(messages[0].content.text).toContain('Only report on the specified users');
   });
 
   it('should generate messages filtered by course_name', () => {
-    const messages = getPromptMessages('course-enrollment-report', { course_name: 'Onboarding' });
+    const messages = getPromptMessages('course-enrollment-report', { user_ids: '123', course_name: 'Onboarding' });
     expect(messages[0].content.text).toContain('Onboarding');
   });
 });
