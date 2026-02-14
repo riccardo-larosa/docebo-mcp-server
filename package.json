@@ -8,8 +8,7 @@
     "test:contract": "vitest run __tests__/api-contract.test.ts",
     "build": "tsc -b",
     "dev:hono": "tsc-watch --onSuccess \"node build/server/hono-index.js\"",
-    "start:stdio": "node build/server/stdio-index.js",
-    "prepublishOnly": "npm run build && npm test"
+    "start": "node build/server/hono-index.js"
   },
   "keywords": [
     "mcp",
@@ -34,14 +33,6 @@
     "node": ">=18"
   },
   "type": "module",
-  "bin": {
-    "docebo-mcp-server": "build/server/stdio-index.js"
-  },
-  "files": [
-    "build",
-    "README.md",
-    "LICENSE"
-  ],
   "dependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",
     "@hono/node-server": "^1.19.9",
