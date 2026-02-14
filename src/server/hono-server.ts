@@ -217,6 +217,8 @@ export async function setupStreamableHttpServer(server: Server, port = 3000, oau
   if (oauthConfig) {
     const resourceMetadataUrl = `${oauthConfig.mcpServerUrl.replace(/\/+$/, '')}/.well-known/oauth-protected-resource`;
 
+    const authServerBase = oauthConfig.authorizationServerUrl.replace(/\/+$/, '');
+
     // RFC 9728 — Protected Resource Metadata
     app.get('/.well-known/oauth-protected-resource', (c) => {
       return c.json({
@@ -224,6 +226,21 @@ export async function setupStreamableHttpServer(server: Server, port = 3000, oau
         authorization_servers: [oauthConfig.authorizationServerUrl],
         scopes_supported: ['api'],
         bearer_methods_supported: ['header'],
+      });
+    });
+
+    // RFC 8414 — Authorization Server Metadata
+    // Served here because Docebo doesn't publish its own AS metadata.
+    // This tells MCP clients where to find Docebo's authorize/token endpoints.
+    app.get('/.well-known/oauth-authorization-server', (c) => {
+      return c.json({
+        issuer: oauthConfig.authorizationServerUrl,
+        authorization_endpoint: `${authServerBase}/oauth2/authorize`,
+        token_endpoint: `${authServerBase}/oauth2/token`,
+        response_types_supported: ['code'],
+        grant_types_supported: ['authorization_code'],
+        code_challenge_methods_supported: ['S256'],
+        scopes_supported: ['api'],
       });
     });
 
