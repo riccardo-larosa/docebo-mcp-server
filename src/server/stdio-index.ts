@@ -18,11 +18,7 @@ async function main() {
     process.exit(1);
   }
 
-  // Obtain (or load cached) access token via OAuth password grant
-  const accessToken = await getAccessToken(apiBaseUrl, clientId, clientSecret, username, password);
-  process.env.BEARER_TOKEN_BEARERAUTH = accessToken;
-
-  // Create the MCP server with a dynamic token provider for refresh
+  // Create the MCP server with a dynamic token provider for OAuth
   const server = createServer({
     getAccessToken: () => getAccessToken(apiBaseUrl, clientId, clientSecret, username, password),
   });
