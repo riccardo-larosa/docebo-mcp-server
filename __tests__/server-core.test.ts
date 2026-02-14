@@ -153,14 +153,14 @@ describe('Server Core — GetPrompt handler', () => {
   });
 
   it('should return messages for a valid prompt', async () => {
-    const result = await getPromptHandler({ params: { name: 'course-enrollment-report', arguments: {} } });
+    const result = await getPromptHandler({ params: { name: 'course-enrollment-report', arguments: { user_ids: '123' } } });
     expect(result.messages).toBeDefined();
     expect(result.messages.length).toBeGreaterThan(0);
     expect(result.messages[0].role).toBe('user');
   });
 
   it('should pass arguments to the prompt', async () => {
-    const result = await getPromptHandler({ params: { name: 'course-enrollment-report', arguments: { course_name: 'Onboarding' } } });
+    const result = await getPromptHandler({ params: { name: 'course-enrollment-report', arguments: { user_ids: '123', course_name: 'Onboarding' } } });
     expect(result.messages[0].content.text).toContain('Onboarding');
   });
 
