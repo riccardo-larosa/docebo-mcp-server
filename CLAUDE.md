@@ -22,9 +22,6 @@ npm run coverage                        # Run tests with coverage report
 ./scripts/test.sh all                   # Full suite: build + typecheck + tests + coverage
 ./scripts/test.sh mcp                   # MCP protocol compliance tests only
 ./scripts/test.sh unit                  # Unit tests only
-
-# Client
-npm run start:simpleClient              # Start interactive CLI client
 ```
 
 ## Architecture
@@ -43,11 +40,7 @@ npm run start:simpleClient              # Start interactive CLI client
 
 **index.ts** — Defines `McpToolDefinition` interface: each tool is a data structure describing an API endpoint (name, method, pathTemplate, inputSchema as JSON Schema, executionParameters for parameter binding, securityRequirements).
 
-**courses.ts / classrooms.ts** — Tool definition maps (`Map<string, McpToolDefinition>`) for Docebo API endpoints. Adding new tools means creating a new map file and registering it in hono-index.ts.
-
-### Client (`src/client/`)
-
-**simpleStreamableHttpClient.ts** — Interactive REPL client with commands: connect, disconnect, list-tools, call-tool, set-token. Manages sessions with resumption tokens.
+**courses.ts / enrollments.ts / users.ts / notifications.ts** — Tool definition maps (`Map<string, McpToolDefinition>`) for Docebo API endpoints. Adding new tools means creating a new map file and registering it in core.ts.
 
 ### Key Patterns
 

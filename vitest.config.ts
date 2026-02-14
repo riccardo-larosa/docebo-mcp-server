@@ -11,7 +11,6 @@ export default defineConfig({
       reportsDirectory: './coverage',
       include: ['src/**/*.ts'], // Files to include in coverage
       exclude: [ // Files/patterns to exclude
-          'src/client/**',
           'src/server/hono-index.ts',
           'src/server/stdio-index.ts',
           'src/types.ts',
