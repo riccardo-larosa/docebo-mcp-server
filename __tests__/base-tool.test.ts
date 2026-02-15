@@ -18,9 +18,10 @@ class EchoTool extends BaseTool {
     openWorldHint: false,
   };
 
-  async process(input: { message: string; count?: number }): Promise<string> {
+  async process(input: { message: string; count?: number }, bearerToken?: string): Promise<string> {
     const count = input.count ?? 1;
-    return Array(count).fill(input.message).join(' ');
+    const prefix = bearerToken ? `[auth] ` : '';
+    return prefix + Array(count).fill(input.message).join(' ');
   }
 }
 
@@ -73,7 +74,7 @@ describe('BaseTool', () => {
     it('should call process with validated input', async () => {
       const spy = vi.spyOn(echoTool, 'process');
       await echoTool.handleRequest({ message: 'test', count: 3 });
-      expect(spy).toHaveBeenCalledWith({ message: 'test', count: 3 });
+      expect(spy).toHaveBeenCalledWith({ message: 'test', count: 3 }, undefined);
       spy.mockRestore();
     });
 
@@ -88,6 +89,12 @@ describe('BaseTool', () => {
       const result = await failingTool.handleRequest({});
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe('Something went wrong');
+    });
+
+    it('should pass bearerToken to process()', async () => {
+      const result = await echoTool.handleRequest({ message: 'hello' }, 'my-token');
+      expect(result.isError).toBeUndefined();
+      expect(result.content[0].text).toBe('[auth] hello');
     });
   });
 

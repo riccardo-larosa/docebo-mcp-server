@@ -119,8 +119,8 @@ describe('Course Enrollment Report Prompt', () => {
     const messages = getPromptMessages('course-enrollment-report', { user_ids: '123, 456' });
     expect(messages).toHaveLength(1);
     expect(messages[0].role).toBe('user');
-    expect(messages[0].content.text).toContain('get-user-progress');
-    expect(messages[0].content.text).toContain('get-enrollment-details');
+    expect(messages[0].content.text).toContain('get_user_progress');
+    expect(messages[0].content.text).toContain('get_enrollment_details');
     expect(messages[0].content.text).toContain('123');
     expect(messages[0].content.text).toContain('456');
     expect(messages[0].content.text).toContain('Only report on the specified users');
@@ -142,8 +142,8 @@ describe('Learner Progress Prompt', () => {
     const messages = getPromptMessages('learner-progress', { user_id: '123' });
     expect(messages).toHaveLength(1);
     expect(messages[0].role).toBe('user');
-    expect(messages[0].content.text).toContain('get-user-progress');
-    expect(messages[0].content.text).toContain('get-enrollment-details');
+    expect(messages[0].content.text).toContain('get_user_progress');
+    expect(messages[0].content.text).toContain('get_enrollment_details');
     expect(messages[0].content.text).toContain('123');
   });
 

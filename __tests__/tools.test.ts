@@ -42,12 +42,12 @@ describe('Tool Definitions', () => {
       }
     });
 
-    it('should have list-all-courses tool with correct schema', () => {
-      const tool = coursesToolsMap.get('list-all-courses');
+    it('should have list_courses tool with correct schema', () => {
+      const tool = coursesToolsMap.get('list_courses');
       expect(tool).toBeDefined();
 
       if (tool) {
-        expect(tool.name).toBe('list-all-courses');
+        expect(tool.name).toBe('list_courses');
         expect(tool.method).toBe('get');
         expect(tool.pathTemplate).toBe('learn/v1/courses');
         expect(tool.inputSchema.properties).toHaveProperty('page_size');
@@ -57,13 +57,14 @@ describe('Tool Definitions', () => {
         expect(tool.inputSchema.properties).toHaveProperty('status');
         expect(tool.inputSchema.properties).toHaveProperty('sort_by');
         expect(tool.inputSchema.properties).toHaveProperty('sort_order');
+        expect(tool.inputSchema.properties).toHaveProperty('response_format');
         expect(tool.executionParameters).toHaveLength(7);
         expect(tool.securityRequirements).toEqual([{ 'bearerAuth': [] }]);
       }
     });
 
-    it('should accept search/filter params in list-all-courses zodSchema', () => {
-      const tool = coursesToolsMap.get('list-all-courses')!;
+    it('should accept search/filter params in list_courses zodSchema', () => {
+      const tool = coursesToolsMap.get('list_courses')!;
       expect(() => tool.zodSchema!.parse({
         search_text: 'compliance',
         category: 'Safety',
@@ -74,7 +75,7 @@ describe('Tool Definitions', () => {
     });
 
     it('should have search/filter executionParameters as query params', () => {
-      const tool = coursesToolsMap.get('list-all-courses')!;
+      const tool = coursesToolsMap.get('list_courses')!;
       const paramNames = tool.executionParameters.map(p => p.name);
       expect(paramNames).toContain('search_text');
       expect(paramNames).toContain('category');
@@ -86,12 +87,12 @@ describe('Tool Definitions', () => {
       }
     });
 
-    it('should have get-a-course tool with correct schema', () => {
-      const tool = coursesToolsMap.get('get-a-course');
+    it('should have get_course tool with correct schema', () => {
+      const tool = coursesToolsMap.get('get_course');
       expect(tool).toBeDefined();
 
       if (tool) {
-        expect(tool.name).toBe('get-a-course');
+        expect(tool.name).toBe('get_course');
         expect(tool.method).toBe('get');
         expect(tool.pathTemplate).toBe('learn/v1/courses/{course_id}');
         expect(tool.inputSchema.properties).toHaveProperty('course_id');
@@ -99,6 +100,19 @@ describe('Tool Definitions', () => {
         expect(tool.executionParameters).toHaveLength(1);
         expect(tool.executionParameters[0]).toEqual({ name: 'course_id', in: 'path' });
       }
+    });
+
+    it('should apply default pagination values', () => {
+      const tool = coursesToolsMap.get('list_courses')!;
+      const parsed = tool.zodSchema!.parse({});
+      expect(parsed).toHaveProperty('page', 0);
+      expect(parsed).toHaveProperty('page_size', 20);
+    });
+
+    it('should enforce max page_size of 200', () => {
+      const tool = coursesToolsMap.get('list_courses')!;
+      expect(() => tool.zodSchema!.parse({ page_size: 201 })).toThrow(ZodError);
+      expect(() => tool.zodSchema!.parse({ page_size: 200 })).not.toThrow();
     });
   });
 
@@ -126,16 +140,16 @@ describe('Tool Definitions', () => {
     });
 
     it('should validate correct input via zodSchema.parse()', () => {
-      const listCourses = coursesToolsMap.get('list-all-courses')!;
+      const listCourses = coursesToolsMap.get('list_courses')!;
       expect(() => listCourses.zodSchema!.parse({})).not.toThrow();
-      expect(() => listCourses.zodSchema!.parse({ page: '0', page_size: '10' })).not.toThrow();
+      expect(() => listCourses.zodSchema!.parse({ page: 0, page_size: 10 })).not.toThrow();
 
-      const getCourse = coursesToolsMap.get('get-a-course')!;
+      const getCourse = coursesToolsMap.get('get_course')!;
       expect(() => getCourse.zodSchema!.parse({ course_id: '123' })).not.toThrow();
     });
 
     it('should reject incorrect input via zodSchema.parse()', () => {
-      const getCourse = coursesToolsMap.get('get-a-course')!;
+      const getCourse = coursesToolsMap.get('get_course')!;
       // Missing required field
       expect(() => getCourse.zodSchema!.parse({})).toThrow(ZodError);
       // Wrong type

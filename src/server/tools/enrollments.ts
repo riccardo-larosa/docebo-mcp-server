@@ -5,20 +5,23 @@ const listEnrollmentsSchema = z.object({
   id_user: z.string().optional().describe("Filter enrollments by user ID"),
   id_course: z.string().optional().describe("Filter enrollments by course ID"),
   status: z.string().optional().describe("Filter by enrollment status (e.g., subscribed, in_progress, completed)"),
-  page: z.string().optional().describe("Zero-based page offset"),
-  page_size: z.string().optional().describe("Max records per page"),
+  page: z.number().int().min(0).default(0).describe("Zero-based page offset (default: 0)"),
+  page_size: z.number().int().min(1).max(200).default(20).describe("Max records per page (default: 20, max: 200)"),
+  response_format: z.enum(['json', 'markdown']).default('json').describe("Response format: 'json' (default) returns raw API data, 'markdown' returns a concise formatted summary."),
 });
 
 const getEnrollmentDetailsSchema = z.object({
   id_course: z.string().describe("The course ID"),
   id_user: z.string().describe("The user ID"),
+  response_format: z.enum(['json', 'markdown']).default('json').describe("Response format: 'json' (default) returns raw API data, 'markdown' returns a concise formatted summary."),
 });
 
 const getUserProgressSchema = z.object({
   id_user: z.string().describe("User ID to get progress for"),
   status: z.string().optional().describe("Filter by enrollment status: subscribed, in_progress, completed"),
-  page: z.string().optional().describe("Zero-based page offset"),
-  page_size: z.string().optional().describe("Max records per page"),
+  page: z.number().int().min(0).default(0).describe("Zero-based page offset (default: 0)"),
+  page_size: z.number().int().min(1).max(200).default(20).describe("Max records per page (default: 20, max: 200)"),
+  response_format: z.enum(['json', 'markdown']).default('json').describe("Response format: 'json' (default) returns raw API data, 'markdown' returns a concise formatted summary."),
 });
 
 const enrollUserSchema = z.object({
@@ -37,8 +40,8 @@ const unenrollUserSchema = z.object({
 });
 
 export const enrollmentsToolsMap: Map<string, McpToolDefinition> = new Map([
-  ["list-enrollments", {
-    name: "list-enrollments",
+  ["list_enrollments", {
+    name: "list_enrollments",
     description: `Purpose: Retrieves a paginated list of course enrollments from the Docebo learning platform.
 
 Returns: Collection of enrollments with user, course, status, and completion data, plus pagination info.
@@ -70,15 +73,15 @@ Usage Guidance:
       openWorldHint: true,
     }
   }],
-  ["get-enrollment-details", {
-    name: "get-enrollment-details",
+  ["get_enrollment_details", {
+    name: "get_enrollment_details",
     description: `Purpose: Retrieves detailed information about a specific enrollment for a given course and user.
 
 Returns: Full enrollment object including completion percentage, dates, status, score, and subscription info.
 
 Usage Guidance:
   - Use when you have both a course ID and user ID and need full enrollment details.
-  - Use list-enrollments first to find enrollments by user or course.`,
+  - Use list_enrollments first to find enrollments by user or course.`,
     inputSchema: z.toJSONSchema(getEnrollmentDetailsSchema),
     zodSchema: getEnrollmentDetailsSchema,
     method: "get",
@@ -97,8 +100,8 @@ Usage Guidance:
       openWorldHint: false,
     }
   }],
-  ["get-user-progress", {
-    name: "get-user-progress",
+  ["get_user_progress", {
+    name: "get_user_progress",
     description: `Purpose: Retrieves all enrollments for a specific user, providing a progress summary across courses.
 
 Returns: Collection of enrollments for the user with status, completion data, and pagination info.
@@ -107,7 +110,7 @@ Usage Guidance:
   - Use to get an overview of a user's learning progress across all courses.
   - Requires id_user to identify the learner.
   - Optionally filter by status (subscribed, in_progress, completed) to focus on specific progress states.
-  - Use get-enrollment-details for full details on a specific course enrollment.
+  - Use get_enrollment_details for full details on a specific course enrollment.
   - Supports pagination via page and page_size parameters.`,
     inputSchema: z.toJSONSchema(getUserProgressSchema),
     zodSchema: getUserProgressSchema,
@@ -129,8 +132,8 @@ Usage Guidance:
       openWorldHint: true,
     }
   }],
-  ["enroll-user", {
-    name: "enroll-user",
+  ["enroll_user", {
+    name: "enroll_user",
     description: `Purpose: Enrolls a single user into a specific course on the Docebo learning platform.
 
 Returns: Enrollment confirmation with details of the created enrollment.
@@ -138,8 +141,8 @@ Returns: Enrollment confirmation with details of the created enrollment.
 Usage Guidance:
   - Use to enroll a user into a course by providing course_id and user_id.
   - Optionally set enrollment level, start date, and expiry date via requestBody.
-  - Use list-all-courses to find the course_id and list-users to find the user_id.
-  - Use get-enrollment-details to verify enrollment after creation.`,
+  - Use list_courses to find the course_id and list_users to find the user_id.
+  - Use get_enrollment_details to verify enrollment after creation.`,
     inputSchema: z.toJSONSchema(enrollUserSchema),
     zodSchema: enrollUserSchema,
     method: "post",
@@ -158,8 +161,8 @@ Usage Guidance:
       openWorldHint: false,
     }
   }],
-  ["unenroll-user", {
-    name: "unenroll-user",
+  ["unenroll_user", {
+    name: "unenroll_user",
     description: `Purpose: Removes a user's enrollment from a specific course on the Docebo learning platform.
 
 Returns: Confirmation of the enrollment removal.
@@ -167,7 +170,7 @@ Returns: Confirmation of the enrollment removal.
 Usage Guidance:
   - Use to unenroll a user from a course by providing id_course and id_user.
   - This action is destructive and cannot be undone — the user's progress in the course will be lost.
-  - Use get-enrollment-details first to verify the enrollment exists.`,
+  - Use get_enrollment_details first to verify the enrollment exists.`,
     inputSchema: z.toJSONSchema(unenrollUserSchema),
     zodSchema: unenrollUserSchema,
     method: "delete",

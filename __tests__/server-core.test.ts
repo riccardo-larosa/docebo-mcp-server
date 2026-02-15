@@ -33,7 +33,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 // Import after mocks are set up
-const { createServer, toolDefinitionMap, securitySchemes, SERVER_NAME, SERVER_VERSION } = await import('../src/server/core.js');
+const { createServer, toolDefinitionMap, securitySchemes, SERVER_NAME, SERVER_VERSION, CHARACTER_LIMIT, formatAsMarkdown, extractPaginationMetadata } = await import('../src/server/core.js');
 
 describe('Server Core — createServer()', () => {
   beforeEach(() => {
@@ -56,7 +56,11 @@ describe('Server Core — createServer()', () => {
 
   it('should export SERVER_NAME and SERVER_VERSION', () => {
     expect(SERVER_NAME).toBe('docebo-mcp-server');
-    expect(SERVER_VERSION).toBe('0.1.0');
+    expect(SERVER_VERSION).toBe('0.3.0');
+  });
+
+  it('should export CHARACTER_LIMIT', () => {
+    expect(CHARACTER_LIMIT).toBe(25000);
   });
 
   it('should have tools in toolDefinitionMap', () => {
@@ -198,7 +202,7 @@ describe('Server Core — CallTool handler', () => {
     expect(result.content[0].text).toContain('Unknown tool');
   });
 
-  it('should execute list-all-courses and return API response', async () => {
+  it('should execute list_courses and return API response', async () => {
     mockAxios.mockResolvedValue({
       status: 200,
       headers: { 'content-type': 'application/json' },
@@ -206,7 +210,7 @@ describe('Server Core — CallTool handler', () => {
     });
 
     const result = await callToolHandler({
-      params: { name: 'list-all-courses', arguments: { page: '0', page_size: '10' } },
+      params: { name: 'list_courses', arguments: { page: 0, page_size: 10 } },
     }, authExtra);
 
     expect(result.isError).toBeUndefined();
@@ -214,7 +218,7 @@ describe('Server Core — CallTool handler', () => {
     expect(result.content[0].text).toContain('Course 1');
   });
 
-  it('should resolve path parameters for get-a-course', async () => {
+  it('should resolve path parameters for get_course', async () => {
     mockAxios.mockResolvedValue({
       status: 200,
       headers: { 'content-type': 'application/json' },
@@ -222,7 +226,7 @@ describe('Server Core — CallTool handler', () => {
     });
 
     const result = await callToolHandler({
-      params: { name: 'get-a-course', arguments: { course_id: '42' } },
+      params: { name: 'get_course', arguments: { course_id: '42' } },
     }, authExtra);
 
     expect(result.isError).toBeUndefined();
@@ -233,9 +237,24 @@ describe('Server Core — CallTool handler', () => {
     expect(axiosCall.url).not.toContain('{course_id}');
   });
 
+  it('should include timeout in axios config', async () => {
+    mockAxios.mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      data: {},
+    });
+
+    await callToolHandler({
+      params: { name: 'list_courses', arguments: {} },
+    }, authExtra);
+
+    const axiosCall = mockAxios.mock.calls[0][0];
+    expect(axiosCall.timeout).toBe(30000);
+  });
+
   it('should return validation error for missing required args', async () => {
     const result = await callToolHandler({
-      params: { name: 'get-a-course', arguments: {} },
+      params: { name: 'get_course', arguments: {} },
     });
 
     expect(result.isError).toBe(true);
@@ -244,7 +263,7 @@ describe('Server Core — CallTool handler', () => {
 
   it('should return validation error for wrong arg types', async () => {
     const result = await callToolHandler({
-      params: { name: 'get-a-course', arguments: { course_id: 123 } },
+      params: { name: 'get_course', arguments: { course_id: 123 } },
     });
 
     expect(result.isError).toBe(true);
@@ -259,7 +278,7 @@ describe('Server Core — CallTool handler', () => {
     });
 
     await callToolHandler({
-      params: { name: 'list-all-courses', arguments: {} },
+      params: { name: 'list_courses', arguments: {} },
     }, authExtra);
 
     const axiosCall = mockAxios.mock.calls[0][0];
@@ -274,7 +293,7 @@ describe('Server Core — CallTool handler', () => {
     });
 
     const result = await callToolHandler({
-      params: { name: 'list-all-courses', arguments: {} },
+      params: { name: 'list_courses', arguments: {} },
     });
 
     expect(result.content[0].text).toContain('plain text response');
@@ -288,7 +307,7 @@ describe('Server Core — CallTool handler', () => {
     });
 
     const result = await callToolHandler({
-      params: { name: 'list-all-courses', arguments: {} },
+      params: { name: 'list_courses', arguments: {} },
     });
 
     expect(result.content[0].text).toContain('Status: 204');
@@ -303,10 +322,26 @@ describe('Server Core — CallTool handler', () => {
     });
 
     const result = await callToolHandler({
-      params: { name: 'list-all-courses', arguments: {} },
+      params: { name: 'list_courses', arguments: {} },
     });
 
     expect(result.content[0].text).toContain('12345');
+  });
+
+  it('should truncate oversized responses', async () => {
+    const largeData = { data: { items: Array(1000).fill({ id: 1, name: 'x'.repeat(100) }) } };
+    mockAxios.mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      data: largeData,
+    });
+
+    const result = await callToolHandler({
+      params: { name: 'list_courses', arguments: {} },
+    }, authExtra);
+
+    expect(result.content[0].text).toContain('[Response truncated');
+    expect(result.content[0].text).toContain('pagination');
   });
 
   it('should handle axios errors with response body', async () => {
@@ -320,7 +355,7 @@ describe('Server Core — CallTool handler', () => {
     mockAxios.mockRejectedValue(axiosError);
 
     const result = await callToolHandler({
-      params: { name: 'list-all-courses', arguments: {} },
+      params: { name: 'list_courses', arguments: {} },
     });
 
     expect(result.isError).toBe(true);
@@ -339,7 +374,7 @@ describe('Server Core — CallTool handler', () => {
     mockAxios.mockRejectedValue(axiosError);
 
     const result = await callToolHandler({
-      params: { name: 'list-all-courses', arguments: {} },
+      params: { name: 'list_courses', arguments: {} },
     });
 
     expect(result.isError).toBe(true);
@@ -357,7 +392,7 @@ describe('Server Core — CallTool handler', () => {
     mockAxios.mockRejectedValue(axiosError);
 
     const result = await callToolHandler({
-      params: { name: 'list-all-courses', arguments: {} },
+      params: { name: 'list_courses', arguments: {} },
     });
 
     expect(result.isError).toBe(true);
@@ -372,7 +407,7 @@ describe('Server Core — CallTool handler', () => {
     mockAxios.mockRejectedValue(axiosError);
 
     const result = await callToolHandler({
-      params: { name: 'list-all-courses', arguments: {} },
+      params: { name: 'list_courses', arguments: {} },
     });
 
     expect(result.isError).toBe(true);
@@ -384,7 +419,7 @@ describe('Server Core — CallTool handler', () => {
     mockAxios.mockRejectedValue(new Error('Random failure'));
 
     const result = await callToolHandler({
-      params: { name: 'list-all-courses', arguments: {} },
+      params: { name: 'list_courses', arguments: {} },
     });
 
     expect(result.isError).toBe(true);
@@ -395,7 +430,7 @@ describe('Server Core — CallTool handler', () => {
     mockAxios.mockRejectedValue('string error');
 
     const result = await callToolHandler({
-      params: { name: 'list-all-courses', arguments: {} },
+      params: { name: 'list_courses', arguments: {} },
     });
 
     expect(result.isError).toBe(true);
@@ -411,7 +446,7 @@ describe('Server Core — CallTool handler', () => {
 
     // Call without authInfo — no token available
     await callToolHandler({
-      params: { name: 'list-all-courses', arguments: {} },
+      params: { name: 'list_courses', arguments: {} },
     });
 
     expect(console.warn).toHaveBeenCalledWith(
@@ -427,13 +462,13 @@ describe('Server Core — CallTool handler', () => {
     });
 
     const result = await callToolHandler({
-      params: { name: 'list-all-courses' },
+      params: { name: 'list_courses' },
     });
 
     expect(result.isError).toBeUndefined();
   });
 
-  it('should execute list-enrollments and return API response', async () => {
+  it('should execute list_enrollments and return API response', async () => {
     mockAxios.mockResolvedValue({
       status: 200,
       headers: { 'content-type': 'application/json' },
@@ -441,7 +476,7 @@ describe('Server Core — CallTool handler', () => {
     });
 
     const result = await callToolHandler({
-      params: { name: 'list-enrollments', arguments: { id_user: '10' } },
+      params: { name: 'list_enrollments', arguments: { id_user: '10' } },
     }, authExtra);
 
     expect(result.isError).toBeUndefined();
@@ -453,7 +488,7 @@ describe('Server Core — CallTool handler', () => {
     expect(axiosCall.params.id_user).toBe('10');
   });
 
-  it('should execute list-users and return API response', async () => {
+  it('should execute list_users and return API response', async () => {
     mockAxios.mockResolvedValue({
       status: 200,
       headers: { 'content-type': 'application/json' },
@@ -461,7 +496,7 @@ describe('Server Core — CallTool handler', () => {
     });
 
     const result = await callToolHandler({
-      params: { name: 'list-users', arguments: { search_text: 'jdoe' } },
+      params: { name: 'list_users', arguments: { search_text: 'jdoe' } },
     }, authExtra);
 
     expect(result.isError).toBeUndefined();
@@ -473,7 +508,7 @@ describe('Server Core — CallTool handler', () => {
     expect(axiosCall.params.search_text).toBe('jdoe');
   });
 
-  it('should resolve path parameters for get-user', async () => {
+  it('should resolve path parameters for get_user', async () => {
     mockAxios.mockResolvedValue({
       status: 200,
       headers: { 'content-type': 'application/json' },
@@ -481,7 +516,7 @@ describe('Server Core — CallTool handler', () => {
     });
 
     const result = await callToolHandler({
-      params: { name: 'get-user', arguments: { user_id: '42' } },
+      params: { name: 'get_user', arguments: { user_id: '42' } },
     }, authExtra);
 
     expect(result.isError).toBeUndefined();
@@ -489,6 +524,67 @@ describe('Server Core — CallTool handler', () => {
     const axiosCall = mockAxios.mock.calls[0][0];
     expect(axiosCall.url).toContain('manage/v1/user/42');
     expect(axiosCall.url).not.toContain('{user_id}');
+  });
+
+  it('should format response as markdown when response_format is markdown', async () => {
+    mockAxios.mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      data: { data: { items: [{ id_course: 1, name: 'Course A', status: 'published' }] } },
+    });
+
+    const result = await callToolHandler({
+      params: { name: 'list_courses', arguments: { response_format: 'markdown' } },
+    }, authExtra);
+
+    expect(result.isError).toBeUndefined();
+    expect(result.content[0].text).toContain('## list_courses');
+    expect(result.content[0].text).toContain('Course A');
+  });
+
+  it('should return JSON by default', async () => {
+    mockAxios.mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      data: { data: { items: [{ id: 1, name: 'Course A' }] } },
+    });
+
+    const result = await callToolHandler({
+      params: { name: 'list_courses', arguments: {} },
+    }, authExtra);
+
+    expect(result.content[0].text).toContain('"name": "Course A"');
+  });
+
+  it('should append pagination metadata for GET endpoints', async () => {
+    mockAxios.mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      data: { data: { items: [], total_count: 100, current_page: 0, page_size: 20, has_more_data: true } },
+    });
+
+    const result = await callToolHandler({
+      params: { name: 'list_courses', arguments: {} },
+    }, authExtra);
+
+    expect(result.content[0].text).toContain('Pagination:');
+    expect(result.content[0].text).toContain('total_count=100');
+    expect(result.content[0].text).toContain('has_more=true');
+  });
+
+  it('should not send response_format to the API', async () => {
+    mockAxios.mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      data: { data: { items: [] } },
+    });
+
+    await callToolHandler({
+      params: { name: 'list_courses', arguments: { response_format: 'markdown' } },
+    }, authExtra);
+
+    const axiosCall = mockAxios.mock.calls[0][0];
+    expect(axiosCall.params).not.toHaveProperty('response_format');
   });
 });
 
@@ -509,15 +605,15 @@ describe('Server Core — New tools in ListTools', () => {
   it('should include enrollment tools in ListTools response', async () => {
     const result = await listToolsHandler();
     const toolNames = result.tools.map((t: any) => t.name);
-    expect(toolNames).toContain('list-enrollments');
-    expect(toolNames).toContain('get-enrollment-details');
+    expect(toolNames).toContain('list_enrollments');
+    expect(toolNames).toContain('get_enrollment_details');
   });
 
   it('should include user tools in ListTools response', async () => {
     const result = await listToolsHandler();
     const toolNames = result.tools.map((t: any) => t.name);
-    expect(toolNames).toContain('list-users');
-    expect(toolNames).toContain('get-user');
+    expect(toolNames).toContain('list_users');
+    expect(toolNames).toContain('get_user');
   });
 });
 
@@ -548,8 +644,8 @@ describe('Server Core — team-training-status prompt', () => {
     expect(result.messages).toBeDefined();
     expect(result.messages.length).toBe(1);
     expect(result.messages[0].role).toBe('user');
-    expect(result.messages[0].content.text).toContain('list-users');
-    expect(result.messages[0].content.text).toContain('list-enrollments');
+    expect(result.messages[0].content.text).toContain('list_users');
+    expect(result.messages[0].content.text).toContain('list_enrollments');
     expect(result.messages[0].content.text).toContain('Include all team members');
     expect(result.messages[0].content.text).toContain('Include all assigned trainings');
   });
@@ -557,7 +653,7 @@ describe('Server Core — team-training-status prompt', () => {
   it('should filter by training_name when provided', async () => {
     const result = await getPromptHandler({ params: { name: 'team-training-status', arguments: { training_name: 'Compliance' } } });
     expect(result.messages[0].content.text).toContain('Compliance');
-    expect(result.messages[0].content.text).toContain('list-all-courses');
+    expect(result.messages[0].content.text).toContain('list_courses');
   });
 
   it('should filter by team_member when provided', async () => {
@@ -593,16 +689,16 @@ describe('Server Core — course-recommendations prompt', () => {
     expect(result.messages).toBeDefined();
     expect(result.messages.length).toBe(1);
     expect(result.messages[0].role).toBe('user');
-    expect(result.messages[0].content.text).toContain('list-users');
-    expect(result.messages[0].content.text).toContain('list-enrollments');
-    expect(result.messages[0].content.text).toContain('list-all-courses');
+    expect(result.messages[0].content.text).toContain('list_users');
+    expect(result.messages[0].content.text).toContain('list_enrollments');
+    expect(result.messages[0].content.text).toContain('list_courses');
     expect(result.messages[0].content.text).toContain('Ask the user');
   });
 
   it('should include user_name in prompt when provided', async () => {
     const result = await getPromptHandler({ params: { name: 'course-recommendations', arguments: { user_name: 'John Smith' } } });
     expect(result.messages[0].content.text).toContain('John Smith');
-    expect(result.messages[0].content.text).toContain('list-users');
+    expect(result.messages[0].content.text).toContain('list_users');
     expect(result.messages[0].content.text).not.toContain('Ask the user');
   });
 
@@ -619,7 +715,7 @@ describe('Server Core — course-recommendations prompt', () => {
   });
 });
 
-describe('Server Core — list-all-courses search params', () => {
+describe('Server Core — list_courses search params', () => {
   let callToolHandler: Function;
   const authExtra = { authInfo: { token: 'test-token-123' } };
 
@@ -646,7 +742,7 @@ describe('Server Core — list-all-courses search params', () => {
     });
 
     await callToolHandler({
-      params: { name: 'list-all-courses', arguments: { search_text: 'compliance' } },
+      params: { name: 'list_courses', arguments: { search_text: 'compliance' } },
     }, authExtra);
 
     const axiosCall = mockAxios.mock.calls[0][0];
@@ -661,7 +757,7 @@ describe('Server Core — list-all-courses search params', () => {
     });
 
     await callToolHandler({
-      params: { name: 'list-all-courses', arguments: { category: 'Safety', status: 'published' } },
+      params: { name: 'list_courses', arguments: { category: 'Safety', status: 'published' } },
     }, authExtra);
 
     const axiosCall = mockAxios.mock.calls[0][0];
@@ -677,7 +773,7 @@ describe('Server Core — list-all-courses search params', () => {
     });
 
     await callToolHandler({
-      params: { name: 'list-all-courses', arguments: { sort_by: 'name', sort_order: 'asc' } },
+      params: { name: 'list_courses', arguments: { sort_by: 'name', sort_order: 'asc' } },
     }, authExtra);
 
     const axiosCall = mockAxios.mock.calls[0][0];
@@ -685,7 +781,7 @@ describe('Server Core — list-all-courses search params', () => {
     expect(axiosCall.params.sort_order).toBe('asc');
   });
 
-  it('should not include undefined search params in query', async () => {
+  it('should apply default pagination when no page args provided', async () => {
     mockAxios.mockResolvedValue({
       status: 200,
       headers: { 'content-type': 'application/json' },
@@ -693,12 +789,122 @@ describe('Server Core — list-all-courses search params', () => {
     });
 
     await callToolHandler({
-      params: { name: 'list-all-courses', arguments: { page: '0' } },
+      params: { name: 'list_courses', arguments: {} },
     }, authExtra);
 
     const axiosCall = mockAxios.mock.calls[0][0];
-    expect(axiosCall.params.page).toBe('0');
-    expect(axiosCall.params).not.toHaveProperty('search_text');
-    expect(axiosCall.params).not.toHaveProperty('category');
+    expect(axiosCall.params.page).toBe(0);
+    expect(axiosCall.params.page_size).toBe(20);
+  });
+});
+
+describe('Server Core — formatAsMarkdown', () => {
+  it('should format list responses as markdown', () => {
+    const data = {
+      data: {
+        items: [
+          { id_course: 1, name: 'Course A', status: 'published', type: 'elearning' },
+          { id_course: 2, name: 'Course B', status: 'draft' },
+        ],
+      },
+    };
+    const result = formatAsMarkdown(data, 'list_courses');
+    expect(result).toContain('## list_courses Results');
+    expect(result).toContain('**Course A**');
+    expect(result).toContain('published');
+    expect(result).toContain('**Course B**');
+  });
+
+  it('should format single record responses as markdown', () => {
+    const data = {
+      data: {
+        id_course: 42,
+        name: 'Test Course',
+        type: 'elearning',
+        status: 'published',
+      },
+    };
+    const result = formatAsMarkdown(data, 'get_course');
+    expect(result).toContain('## get_course Result');
+    expect(result).toContain('**name**: Test Course');
+    expect(result).toContain('**type**: elearning');
+  });
+
+  it('should cap items at 50', () => {
+    const items = Array(60).fill(null).map((_, i) => ({ id: i, name: `Item ${i}` }));
+    const data = { data: { items } };
+    const result = formatAsMarkdown(data, 'list_courses');
+    expect(result).toContain('...and 10 more items');
+  });
+
+  it('should fallback to JSON for unrecognized data', () => {
+    const result = formatAsMarkdown(null, 'test');
+    expect(result).toBe('null');
+  });
+});
+
+describe('Server Core — extractPaginationMetadata', () => {
+  it('should extract pagination fields from data.data', () => {
+    const data = {
+      data: {
+        items: [],
+        total_count: 100,
+        current_page: 2,
+        page_size: 20,
+        has_more_data: true,
+      },
+    };
+    const result = extractPaginationMetadata(data);
+    expect(result).toContain('total_count=100');
+    expect(result).toContain('current_page=2');
+    expect(result).toContain('page_size=20');
+    expect(result).toContain('has_more=true');
+  });
+
+  it('should return null when no pagination fields present', () => {
+    const data = { data: { items: [] } };
+    const result = extractPaginationMetadata(data);
+    expect(result).toBeNull();
+  });
+
+  it('should handle partial pagination fields', () => {
+    const data = { data: { total_count: 50 } };
+    const result = extractPaginationMetadata(data);
+    expect(result).toContain('total_count=50');
+    expect(result).not.toContain('current_page');
+  });
+});
+
+describe('Server Core — prompts use snake_case tool names', () => {
+  let getPromptHandler: Function;
+
+  beforeEach(() => {
+    registeredHandlers.clear();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    createServer();
+    getPromptHandler = registeredHandlers.get(GetPromptRequestSchema)!;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('course-enrollment-report should reference snake_case tool names', async () => {
+    const result = await getPromptHandler({ params: { name: 'course-enrollment-report', arguments: { user_ids: '123' } } });
+    const text = result.messages[0].content.text;
+    expect(text).toContain('get_user_progress');
+    expect(text).toContain('list_courses');
+    expect(text).toContain('get_enrollment_details');
+    expect(text).not.toContain('get-user-progress');
+    expect(text).not.toContain('list-all-courses');
+  });
+
+  it('learner-progress should reference snake_case tool names', async () => {
+    const result = await getPromptHandler({ params: { name: 'learner-progress', arguments: { user_id: '123' } } });
+    const text = result.messages[0].content.text;
+    expect(text).toContain('get_user_progress');
+    expect(text).toContain('get_enrollment_details');
+    expect(text).not.toContain('get-user-progress');
+    expect(text).not.toContain('get-enrollment-details');
   });
 });

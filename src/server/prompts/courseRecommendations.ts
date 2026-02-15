@@ -17,11 +17,11 @@ registerPrompt({
   ],
   getMessages: (args) => {
     const userLookup = args.user_name
-      ? `Look up the employee "${args.user_name}" using the "list-users" tool (search_text parameter). Then use "get-user" with their user_id to get full profile details (role, department, branch).`
-      : `Ask the user for their name or email, then use the "list-users" tool to find them. Use "get-user" with their user_id to get full profile details (role, department, branch).`;
+      ? `Look up the employee "${args.user_name}" using the "list_users" tool (search_text parameter). Then use "get_user" with their user_id to get full profile details (role, department, branch).`
+      : `Ask the user for their name or email, then use the "list_users" tool to find them. Use "get_user" with their user_id to get full profile details (role, department, branch).`;
 
     const interestFilter = args.interest_area
-      ? `The employee is interested in "${args.interest_area}". Use the "list-all-courses" tool with search_text="${args.interest_area}" to find courses matching this interest.`
+      ? `The employee is interested in "${args.interest_area}". Use the "list_courses" tool with search_text="${args.interest_area}" to find courses matching this interest.`
       : "No specific interest area was provided. Base recommendations on the employee's role, department, and gaps in their learning history.";
 
     return [
@@ -36,9 +36,9 @@ ${userLookup}
 ${interestFilter}
 
 Steps:
-1. ${args.user_name ? `Use "list-users" to find "${args.user_name}", then "get-user" to retrieve their profile (role, department, branch).` : 'Ask the user to identify themselves, then look them up with "list-users" and "get-user".'}
-2. Use "list-enrollments" with the user's id_user to retrieve their completed and in-progress courses.
-3. Use "list-all-courses"${args.interest_area ? ` with search_text="${args.interest_area}"` : ""} to browse the available course catalog. Also try filtering by category or status=published to find relevant offerings.
+1. ${args.user_name ? `Use "list_users" to find "${args.user_name}", then "get_user" to retrieve their profile (role, department, branch).` : 'Ask the user to identify themselves, then look them up with "list_users" and "get_user".'}
+2. Use "list_enrollments" with the user's id_user to retrieve their completed and in-progress courses.
+3. Use "list_courses"${args.interest_area ? ` with search_text="${args.interest_area}"` : ""} to browse the available course catalog. Also try filtering by category or status=published to find relevant offerings.
 4. Analyze gaps: compare what the employee has completed vs. what is available and relevant to their role/department/interests.
 5. Present the top recommendations in a table with columns: Course Name, Category, Why Recommended, Relevance (High/Medium/Low).
 

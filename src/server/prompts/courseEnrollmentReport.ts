@@ -40,9 +40,9 @@ ${courseFilter}
 IMPORTANT: Only report on the specified users. Never generate enrollment reports for all users.
 
 Steps:
-1. For each user ID, use the "get-user-progress" tool with id_user to retrieve their enrollments.
-2. If a course_name filter was specified, use "list-all-courses" with search_text to find matching course IDs, then only include enrollments for those courses.
-3. For any enrollment of interest, use "get-enrollment-details" to get completion and score details.
+1. For each user ID, use the "get_user_progress" tool with id_user to retrieve their enrollments.
+2. If a course_name filter was specified, use "list_courses" with search_text to find matching course IDs, then only include enrollments for those courses.
+3. For any enrollment of interest, use "get_enrollment_details" to get completion and score details.
 4. Summarize the results in a table with columns: User Name, Course Name, Course ID, Status, Completion %, Score, and Enrollment Date.
 
 Present the report in a clear, structured format.`,

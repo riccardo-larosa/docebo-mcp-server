@@ -17,8 +17,8 @@ const sendLearningPlanNotificationSchema = z.object({
 });
 
 export const notificationsToolsMap: Map<string, McpToolDefinition> = new Map([
-  ["send-training-reminder", {
-    name: "send-training-reminder",
+  ["send_training_reminder", {
+    name: "send_training_reminder",
     description: `Purpose: Sends a custom training reminder email to a specific user on the Docebo platform.
 
 Returns: Confirmation that the email was sent.
@@ -26,7 +26,7 @@ Returns: Confirmation that the email was sent.
 Usage Guidance:
   - Use to send a reminder or custom email to a learner by their user ID.
   - Requires subject and message (HTML is supported in the message body).
-  - Use list-users to find the user's ID before sending.
+  - Use list_users to find the user's ID before sending.
   - This triggers an actual email — use with care.`,
     inputSchema: z.toJSONSchema(sendTrainingReminderSchema),
     zodSchema: sendTrainingReminderSchema,
@@ -43,8 +43,8 @@ Usage Guidance:
       openWorldHint: true,
     }
   }],
-  ["send-learning-plan-notification", {
-    name: "send-learning-plan-notification",
+  ["send_learning_plan_notification", {
+    name: "send_learning_plan_notification",
     description: `Purpose: Triggers a platform-configured notification for a user and learning plan combination.
 
 Returns: Confirmation that the notification was triggered.

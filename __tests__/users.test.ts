@@ -32,11 +32,11 @@ describe('User Tools', () => {
     }
   });
 
-  describe('list-users', () => {
-    const tool = usersToolsMap.get('list-users')!;
+  describe('list_users', () => {
+    const tool = usersToolsMap.get('list_users')!;
 
     it('should have correct metadata', () => {
-      expect(tool.name).toBe('list-users');
+      expect(tool.name).toBe('list_users');
       expect(tool.method).toBe('get');
       expect(tool.pathTemplate).toBe('manage/v1/user');
       expect(tool.executionParameters).toHaveLength(3);
@@ -51,12 +51,22 @@ describe('User Tools', () => {
 
     it('should validate correct input (all optional)', () => {
       expect(() => tool.zodSchema!.parse({})).not.toThrow();
-      expect(() => tool.zodSchema!.parse({ search_text: 'john', page: '0', page_size: '10' })).not.toThrow();
+      expect(() => tool.zodSchema!.parse({ search_text: 'john', page: 0, page_size: 10 })).not.toThrow();
     });
 
     it('should reject invalid input', () => {
       expect(() => tool.zodSchema!.parse({ search_text: 123 })).toThrow(ZodError);
-      expect(() => tool.zodSchema!.parse({ page: true })).toThrow(ZodError);
+      expect(() => tool.zodSchema!.parse({ page: 'abc' })).toThrow(ZodError);
+    });
+
+    it('should apply default pagination values', () => {
+      const parsed = tool.zodSchema!.parse({});
+      expect(parsed).toHaveProperty('page', 0);
+      expect(parsed).toHaveProperty('page_size', 20);
+    });
+
+    it('should enforce max page_size of 200', () => {
+      expect(() => tool.zodSchema!.parse({ page_size: 201 })).toThrow(ZodError);
     });
 
     it('should have correct query parameters', () => {
@@ -70,11 +80,11 @@ describe('User Tools', () => {
     });
   });
 
-  describe('get-user', () => {
-    const tool = usersToolsMap.get('get-user')!;
+  describe('get_user', () => {
+    const tool = usersToolsMap.get('get_user')!;
 
     it('should have correct metadata', () => {
-      expect(tool.name).toBe('get-user');
+      expect(tool.name).toBe('get_user');
       expect(tool.method).toBe('get');
       expect(tool.pathTemplate).toBe('manage/v1/user/{user_id}');
       expect(tool.executionParameters).toHaveLength(1);
@@ -114,8 +124,8 @@ describe('User Tools', () => {
     });
 
     it('should have openWorldHint=true on list, false on get', () => {
-      expect(usersToolsMap.get('list-users')!.annotations!.openWorldHint).toBe(true);
-      expect(usersToolsMap.get('get-user')!.annotations!.openWorldHint).toBe(false);
+      expect(usersToolsMap.get('list_users')!.annotations!.openWorldHint).toBe(true);
+      expect(usersToolsMap.get('get_user')!.annotations!.openWorldHint).toBe(false);
     });
   });
 });

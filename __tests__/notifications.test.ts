@@ -26,11 +26,11 @@ describe('Notification Tools', () => {
     }
   });
 
-  describe('send-training-reminder', () => {
-    const tool = notificationsToolsMap.get('send-training-reminder')!;
+  describe('send_training_reminder', () => {
+    const tool = notificationsToolsMap.get('send_training_reminder')!;
 
     it('should have correct metadata', () => {
-      expect(tool.name).toBe('send-training-reminder');
+      expect(tool.name).toBe('send_training_reminder');
       expect(tool.method).toBe('post');
       expect(tool.pathTemplate).toBe('manage/v1/user/send_mail');
       expect(tool.executionParameters).toHaveLength(0);
@@ -79,11 +79,11 @@ describe('Notification Tools', () => {
     });
   });
 
-  describe('send-learning-plan-notification', () => {
-    const tool = notificationsToolsMap.get('send-learning-plan-notification')!;
+  describe('send_learning_plan_notification', () => {
+    const tool = notificationsToolsMap.get('send_learning_plan_notification')!;
 
     it('should have correct metadata', () => {
-      expect(tool.name).toBe('send-learning-plan-notification');
+      expect(tool.name).toBe('send_learning_plan_notification');
       expect(tool.method).toBe('post');
       expect(tool.pathTemplate).toBe('manage/v1/notifications/external_notification');
       expect(tool.executionParameters).toHaveLength(0);

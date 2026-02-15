@@ -32,11 +32,11 @@ describe('Enrollment Tools', () => {
     }
   });
 
-  describe('list-enrollments', () => {
-    const tool = enrollmentsToolsMap.get('list-enrollments')!;
+  describe('list_enrollments', () => {
+    const tool = enrollmentsToolsMap.get('list_enrollments')!;
 
     it('should have correct metadata', () => {
-      expect(tool.name).toBe('list-enrollments');
+      expect(tool.name).toBe('list_enrollments');
       expect(tool.method).toBe('get');
       expect(tool.pathTemplate).toBe('learn/v1/enrollments');
       expect(tool.executionParameters).toHaveLength(5);
@@ -51,13 +51,23 @@ describe('Enrollment Tools', () => {
 
     it('should validate correct input (all optional)', () => {
       expect(() => tool.zodSchema!.parse({})).not.toThrow();
-      expect(() => tool.zodSchema!.parse({ id_user: '123', page: '0', page_size: '10' })).not.toThrow();
+      expect(() => tool.zodSchema!.parse({ id_user: '123', page: 0, page_size: 10 })).not.toThrow();
       expect(() => tool.zodSchema!.parse({ id_course: '456', status: 'completed' })).not.toThrow();
     });
 
     it('should reject invalid input', () => {
       expect(() => tool.zodSchema!.parse({ id_user: 123 })).toThrow(ZodError);
       expect(() => tool.zodSchema!.parse({ status: true })).toThrow(ZodError);
+    });
+
+    it('should apply default pagination values', () => {
+      const parsed = tool.zodSchema!.parse({});
+      expect(parsed).toHaveProperty('page', 0);
+      expect(parsed).toHaveProperty('page_size', 20);
+    });
+
+    it('should enforce max page_size of 200', () => {
+      expect(() => tool.zodSchema!.parse({ page_size: 201 })).toThrow(ZodError);
     });
 
     it('should have correct query parameters', () => {
@@ -73,11 +83,11 @@ describe('Enrollment Tools', () => {
     });
   });
 
-  describe('get-enrollment-details', () => {
-    const tool = enrollmentsToolsMap.get('get-enrollment-details')!;
+  describe('get_enrollment_details', () => {
+    const tool = enrollmentsToolsMap.get('get_enrollment_details')!;
 
     it('should have correct metadata', () => {
-      expect(tool.name).toBe('get-enrollment-details');
+      expect(tool.name).toBe('get_enrollment_details');
       expect(tool.method).toBe('get');
       expect(tool.pathTemplate).toBe('learn/v1/enrollments/{id_course}/{id_user}');
       expect(tool.executionParameters).toHaveLength(2);
@@ -110,11 +120,11 @@ describe('Enrollment Tools', () => {
     });
   });
 
-  describe('get-user-progress', () => {
-    const tool = enrollmentsToolsMap.get('get-user-progress')!;
+  describe('get_user_progress', () => {
+    const tool = enrollmentsToolsMap.get('get_user_progress')!;
 
     it('should have correct metadata', () => {
-      expect(tool.name).toBe('get-user-progress');
+      expect(tool.name).toBe('get_user_progress');
       expect(tool.method).toBe('get');
       expect(tool.pathTemplate).toBe('learn/v1/enrollments');
       expect(tool.executionParameters).toHaveLength(4);
@@ -136,9 +146,15 @@ describe('Enrollment Tools', () => {
       expect(() => tool.zodSchema!.parse({
         id_user: '123',
         status: 'completed',
-        page: '0',
-        page_size: '20',
+        page: 0,
+        page_size: 20,
       })).not.toThrow();
+    });
+
+    it('should apply default pagination values', () => {
+      const parsed = tool.zodSchema!.parse({ id_user: '123' });
+      expect(parsed).toHaveProperty('page', 0);
+      expect(parsed).toHaveProperty('page_size', 20);
     });
 
     it('should have query parameters only', () => {
@@ -153,11 +169,11 @@ describe('Enrollment Tools', () => {
     });
   });
 
-  describe('enroll-user', () => {
-    const tool = enrollmentsToolsMap.get('enroll-user')!;
+  describe('enroll_user', () => {
+    const tool = enrollmentsToolsMap.get('enroll_user')!;
 
     it('should have correct metadata', () => {
-      expect(tool.name).toBe('enroll-user');
+      expect(tool.name).toBe('enroll_user');
       expect(tool.method).toBe('post');
       expect(tool.pathTemplate).toBe('learn/v1/enrollments/{course_id}/{user_id}');
       expect(tool.executionParameters).toHaveLength(2);
@@ -189,11 +205,11 @@ describe('Enrollment Tools', () => {
     });
   });
 
-  describe('unenroll-user', () => {
-    const tool = enrollmentsToolsMap.get('unenroll-user')!;
+  describe('unenroll_user', () => {
+    const tool = enrollmentsToolsMap.get('unenroll_user')!;
 
     it('should have correct metadata', () => {
-      expect(tool.name).toBe('unenroll-user');
+      expect(tool.name).toBe('unenroll_user');
       expect(tool.method).toBe('delete');
       expect(tool.pathTemplate).toBe('learn/v1/enrollments/{id_course}/{id_user}');
       expect(tool.executionParameters).toHaveLength(2);
@@ -226,22 +242,22 @@ describe('Enrollment Tools', () => {
     });
 
     it('read-only tools should have readOnlyHint=true', () => {
-      expect(enrollmentsToolsMap.get('list-enrollments')!.annotations!.readOnlyHint).toBe(true);
-      expect(enrollmentsToolsMap.get('get-enrollment-details')!.annotations!.readOnlyHint).toBe(true);
-      expect(enrollmentsToolsMap.get('get-user-progress')!.annotations!.readOnlyHint).toBe(true);
+      expect(enrollmentsToolsMap.get('list_enrollments')!.annotations!.readOnlyHint).toBe(true);
+      expect(enrollmentsToolsMap.get('get_enrollment_details')!.annotations!.readOnlyHint).toBe(true);
+      expect(enrollmentsToolsMap.get('get_user_progress')!.annotations!.readOnlyHint).toBe(true);
     });
 
     it('write tools should have readOnlyHint=false', () => {
-      expect(enrollmentsToolsMap.get('enroll-user')!.annotations!.readOnlyHint).toBe(false);
-      expect(enrollmentsToolsMap.get('unenroll-user')!.annotations!.readOnlyHint).toBe(false);
+      expect(enrollmentsToolsMap.get('enroll_user')!.annotations!.readOnlyHint).toBe(false);
+      expect(enrollmentsToolsMap.get('unenroll_user')!.annotations!.readOnlyHint).toBe(false);
     });
 
     it('should have openWorldHint=true on list-style, false on targeted tools', () => {
-      expect(enrollmentsToolsMap.get('list-enrollments')!.annotations!.openWorldHint).toBe(true);
-      expect(enrollmentsToolsMap.get('get-enrollment-details')!.annotations!.openWorldHint).toBe(false);
-      expect(enrollmentsToolsMap.get('get-user-progress')!.annotations!.openWorldHint).toBe(true);
-      expect(enrollmentsToolsMap.get('enroll-user')!.annotations!.openWorldHint).toBe(false);
-      expect(enrollmentsToolsMap.get('unenroll-user')!.annotations!.openWorldHint).toBe(false);
+      expect(enrollmentsToolsMap.get('list_enrollments')!.annotations!.openWorldHint).toBe(true);
+      expect(enrollmentsToolsMap.get('get_enrollment_details')!.annotations!.openWorldHint).toBe(false);
+      expect(enrollmentsToolsMap.get('get_user_progress')!.annotations!.openWorldHint).toBe(true);
+      expect(enrollmentsToolsMap.get('enroll_user')!.annotations!.openWorldHint).toBe(false);
+      expect(enrollmentsToolsMap.get('unenroll_user')!.annotations!.openWorldHint).toBe(false);
     });
   });
 });

@@ -37,8 +37,9 @@ type JsonObject = Record<string, any>;
  * Server configuration
  */
 export const SERVER_NAME = "docebo-mcp-server";
-export const SERVER_VERSION = "0.1.0";
+export const SERVER_VERSION = "0.3.0";
 export const API_BASE_URL = process.env.API_BASE_URL;
+export const CHARACTER_LIMIT = 25000;
 
 /**
  * Combined tool entry map from all tool sources.
@@ -124,7 +125,7 @@ export function createServer(): Server {
 
     // Class-based tools handle their own validation and execution
     if (entry instanceof BaseTool) {
-      return entry.handleRequest(toolArgs ?? {});
+      return entry.handleRequest(toolArgs ?? {}, authToken);
     }
 
     return await executeApiTool(toolName, entry, toolArgs ?? {}, authToken);
@@ -213,6 +214,7 @@ async function executeApiTool(
       url: requestUrl,
       params: queryParams,
       headers: headers,
+      timeout: 30000,
       ...(requestBodyData !== undefined && { data: requestBodyData }),
     };
 
@@ -220,11 +222,17 @@ async function executeApiTool(
 
     const response = await axios(config);
 
+    // Extract response_format (consumed locally, not sent to API)
+    const responseFormat = validatedArgs['response_format'] as string | undefined;
+
     // Process and format the response
     let responseText = '';
     const contentType = response.headers['content-type']?.toLowerCase() || '';
 
-    if (contentType.includes('application/json') && typeof response.data === 'object' && response.data !== null) {
+    if (responseFormat === 'markdown' && definition.method.toLowerCase() === 'get' &&
+        contentType.includes('application/json') && typeof response.data === 'object' && response.data !== null) {
+      responseText = formatAsMarkdown(response.data, toolName);
+    } else if (contentType.includes('application/json') && typeof response.data === 'object' && response.data !== null) {
       try {
         responseText = JSON.stringify(response.data, null, 2);
       } catch (e) {
@@ -239,6 +247,20 @@ async function executeApiTool(
     }
     else {
       responseText = `(Status: ${response.status} - No body content)`;
+    }
+
+    // Append pagination metadata for GET endpoints
+    if (definition.method.toLowerCase() === 'get' && typeof response.data === 'object' && response.data !== null) {
+      const paginationSummary = extractPaginationMetadata(response.data);
+      if (paginationSummary) {
+        responseText += '\n\n' + paginationSummary;
+      }
+    }
+
+    // Truncate oversized responses to stay within LLM context limits
+    if (responseText.length > CHARACTER_LIMIT) {
+      responseText = responseText.substring(0, CHARACTER_LIMIT) +
+        '\n\n[Response truncated. Use pagination (page, page_size) or filters to narrow results.]';
     }
 
     return {
@@ -266,6 +288,88 @@ async function executeApiTool(
     console.error(`Error during execution of tool '${toolName}':`, errorMessage);
     return { content: [{ type: "text", text: errorMessage }], isError: true };
   }
+}
+
+/**
+ * Formats API response data as concise markdown summary.
+ * Extracts items from Docebo's standard response structure and summarizes key fields.
+ */
+export function formatAsMarkdown(data: any, toolName: string): string {
+  const MAX_ITEMS = 50;
+  const lines: string[] = [];
+
+  // Docebo responses typically wrap data in a `data` property
+  const payload = data?.data ?? data;
+
+  // Handle list responses (items array)
+  const items = payload?.items ?? (Array.isArray(payload) ? payload : null);
+  if (items && Array.isArray(items)) {
+    lines.push(`## ${toolName} Results`);
+    lines.push('');
+    const displayItems = items.slice(0, MAX_ITEMS);
+
+    for (const item of displayItems) {
+      // Build a summary line from key fields
+      const id = item.id_course ?? item.id ?? item.user_id ?? item.id_user ?? '';
+      const name = item.name ?? item.username ?? item.course_name ?? '';
+      const status = item.status ?? '';
+
+      let summary = `- **${name || `ID: ${id}`}**`;
+      if (id && name) summary += ` (ID: ${id})`;
+      if (status) summary += ` — ${status}`;
+
+      // Add extra relevant fields
+      const extras: string[] = [];
+      if (item.email) extras.push(`email: ${item.email}`);
+      if (item.course_type ?? item.type) extras.push(`type: ${item.course_type ?? item.type}`);
+      if (item.completion_percentage !== undefined) extras.push(`completion: ${item.completion_percentage}%`);
+      if (item.score !== undefined) extras.push(`score: ${item.score}`);
+      if (item.category) extras.push(`category: ${item.category}`);
+
+      if (extras.length > 0) summary += ` | ${extras.join(', ')}`;
+      lines.push(summary);
+    }
+
+    if (items.length > MAX_ITEMS) {
+      lines.push('');
+      lines.push(`_...and ${items.length - MAX_ITEMS} more items (use pagination to see all)_`);
+    }
+  } else if (typeof payload === 'object' && payload !== null) {
+    // Single record response
+    lines.push(`## ${toolName} Result`);
+    lines.push('');
+    for (const [key, value] of Object.entries(payload)) {
+      if (value !== null && value !== undefined && typeof value !== 'object') {
+        lines.push(`- **${key}**: ${value}`);
+      }
+    }
+  }
+
+  return lines.length > 0 ? lines.join('\n') : JSON.stringify(data, null, 2);
+}
+
+/**
+ * Extracts pagination metadata from Docebo API response and returns a summary line.
+ */
+export function extractPaginationMetadata(data: any): string | null {
+  const payload = data?.data ?? data;
+
+  const totalCount = payload?.total_count ?? payload?.count ?? null;
+  const currentPage = payload?.current_page ?? null;
+  const pageSize = payload?.page_size ?? null;
+  const hasMore = payload?.has_more_data ?? payload?.has_more ?? null;
+
+  if (totalCount === null && currentPage === null && hasMore === null) {
+    return null;
+  }
+
+  const parts: string[] = ['--- Pagination:'];
+  if (totalCount !== null) parts.push(`total_count=${totalCount}`);
+  if (currentPage !== null) parts.push(`current_page=${currentPage}`);
+  if (pageSize !== null) parts.push(`page_size=${pageSize}`);
+  if (hasMore !== null) parts.push(`has_more=${hasMore}`);
+
+  return parts.join(' ');
 }
 
 /**
