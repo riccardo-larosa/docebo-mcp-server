@@ -9,8 +9,24 @@ An [MCP](https://modelcontextprotocol.io/) (Model Context Protocol) server that 
 ## Prerequisites
 
 - Node.js >= 18
-- A Docebo platform instance with API credentials (OAuth client ID/secret)
+- A Docebo platform instance with API credentials (see below)
 - A publicly accessible URL for the server (e.g. via a cloud provider or tunnel)
+
+### Docebo OAuth App Setup
+
+Each MCP client requires an **API Credentials** app registered in your Docebo admin panel (**Admin Menu > API and SSO > API Credentials**). For each app:
+
+1. **Grant types:** Enable **Authorization Code + Implicit Grant** and **Resource Owner Password Credentials**
+2. **Redirect URI:** Set to the exact callback URL for your MCP client:
+
+| Client | Redirect URI |
+|--------|-------------|
+| Claude Desktop | `https://claude.ai/api/mcp/auth_callback` |
+| Claude Desktop (future) | `https://claude.com/api/mcp/auth_callback` |
+| Claude Code CLI | `http://localhost:{port}/oauth/callback` (use a fixed port with `--callback-port`) |
+| Cursor | `http://127.0.0.1:{port}/callback` |
+
+> **Note:** Docebo enforces strict redirect URI matching. The URI must match exactly what the MCP client sends during the OAuth flow.
 
 ## Setup
 
