@@ -1,12 +1,16 @@
 import axios, { type AxiosRequestConfig } from 'axios';
+import { logger } from '../logger.js';
 
 /**
  * Lightweight HTTP client for Docebo API calls from workflow tools.
  * Handles URL construction, auth headers, timeouts, and error formatting.
+ * Emits a structured wide event for every outbound API call.
  */
 export class DoceboApiClient {
   private baseUrl: string;
   private token: string;
+  /** Number of API calls made by this client instance. */
+  callCount = 0;
 
   constructor(bearerToken: string, apiBaseUrl: string) {
     this.token = bearerToken;
@@ -22,7 +26,8 @@ export class DoceboApiClient {
   }
 
   private async request<T>(opts: { method: string; path: string; params?: Record<string, any>; data?: any }): Promise<T> {
-    const url = `${this.baseUrl}/${opts.path.replace(/^\/+/, '')}`;
+    const cleanPath = opts.path.replace(/^\/+/, '');
+    const url = `${this.baseUrl}/${cleanPath}`;
     const config: AxiosRequestConfig = {
       method: opts.method,
       url,
@@ -36,15 +41,49 @@ export class DoceboApiClient {
       ...(opts.data !== undefined && { data: opts.data }),
     };
 
+    const start = Date.now();
+    this.callCount++;
+
     try {
       const response = await axios(config);
+
+      logger.info({
+        event: 'docebo_api_call',
+        method: opts.method,
+        path: cleanPath,
+        status: response.status,
+        duration_ms: Date.now() - start,
+      });
+
       return response.data as T;
     } catch (error: unknown) {
+      const duration_ms = Date.now() - start;
+
       if (axios.isAxiosError(error) && error.response) {
         const { status, statusText, data } = error.response;
         const detail = typeof data === 'string' ? data : JSON.stringify(data);
+
+        logger.error({
+          event: 'docebo_api_call',
+          method: opts.method,
+          path: cleanPath,
+          status,
+          duration_ms,
+          error: `${status} ${statusText}`,
+        });
+
         throw new Error(`Docebo API error: ${status} ${statusText} — ${detail}`);
       }
+
+      logger.error({
+        event: 'docebo_api_call',
+        method: opts.method,
+        path: cleanPath,
+        status: null,
+        duration_ms,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
       throw error;
     }
   }

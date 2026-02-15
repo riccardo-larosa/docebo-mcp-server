@@ -451,21 +451,25 @@ describe('Server Core — CallTool handler', () => {
     expect(result.content[0].text).toContain('string error');
   });
 
-  it('should warn when no bearer token is available', async () => {
+  it('should log error when no bearer token is available', async () => {
     mockAxios.mockResolvedValue({
       status: 200,
       headers: { 'content-type': 'application/json' },
       data: {},
     });
 
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
     // Call without authInfo — no token available
     await callToolHandler({
       params: { name: 'list_courses', arguments: {} },
     });
 
-    expect(console.warn).toHaveBeenCalledWith(
-      expect.stringContaining('requires authentication'),
-    );
+    const logLines = stderrSpy.mock.calls.map(c => String(c[0]));
+    const missingTokenLog = logLines.find(l => l.includes('missing_bearer_token'));
+    expect(missingTokenLog).toBeDefined();
+
+    stderrSpy.mockRestore();
   });
 
   it('should handle null arguments gracefully', async () => {
