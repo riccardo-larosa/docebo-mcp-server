@@ -17,6 +17,7 @@ import { coursesToolsMap } from './tools/courses.js';
 import { enrollmentsToolsMap } from './tools/enrollments.js';
 import { usersToolsMap } from './tools/users.js';
 import { notificationsToolsMap } from './tools/notifications.js';
+import { LearnerDashboardTool } from './tools/workflows/learnerDashboard.js';
 import { getPrompts, getPromptMessages } from './prompts/index.js';
 import './prompts/courseEnrollmentReport.js';
 import './prompts/learnerProgress.js';
@@ -49,6 +50,7 @@ export const toolDefinitionMap: Map<string, ToolEntry> = new Map([
   ...enrollmentsToolsMap,
   ...usersToolsMap,
   ...notificationsToolsMap,
+  ['get_learner_dashboard', new LearnerDashboardTool()],
 ]);
 
 /**
