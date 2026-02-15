@@ -44,13 +44,20 @@ export class DoceboApiClient {
     const start = Date.now();
     this.callCount++;
 
+    // Build common log fields (include params for GET, body keys for POST)
+    const logFields: Record<string, unknown> = {
+      event: 'docebo_api_call',
+      method: opts.method,
+      path: cleanPath,
+    };
+    if (opts.params) logFields.params = opts.params;
+    if (opts.data !== undefined) logFields.body = opts.data;
+
     try {
       const response = await axios(config);
 
       logger.info({
-        event: 'docebo_api_call',
-        method: opts.method,
-        path: cleanPath,
+        ...logFields,
         status: response.status,
         duration_ms: Date.now() - start,
       });
@@ -64,9 +71,7 @@ export class DoceboApiClient {
         const detail = typeof data === 'string' ? data : JSON.stringify(data);
 
         logger.error({
-          event: 'docebo_api_call',
-          method: opts.method,
-          path: cleanPath,
+          ...logFields,
           status,
           duration_ms,
           error: `${status} ${statusText}`,
@@ -76,9 +81,7 @@ export class DoceboApiClient {
       }
 
       logger.error({
-        event: 'docebo_api_call',
-        method: opts.method,
-        path: cleanPath,
+        ...logFields,
         status: null,
         duration_ms,
         error: error instanceof Error ? error.message : String(error),

@@ -248,6 +248,8 @@ async function executeApiTool(
       tool: toolName,
       method: config.method,
       path: pathPart,
+      ...(Object.keys(queryParams).length > 0 && { params: queryParams }),
+      ...(requestBodyData !== undefined && { body: requestBodyData }),
       status: response.status,
       duration_ms: Date.now() - apiStart,
     });
