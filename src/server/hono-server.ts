@@ -248,7 +248,17 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
   if (oauthConfig) {
     const resourceMetadataUrl = `${oauthConfig.mcpServerUrl.replace(/\/+$/, '')}/.well-known/oauth-protected-resource`;
 
-    const authServerBase = oauthConfig.authorizationServerUrl?.replace(/\/+$/, '');
+    const mcpBase = oauthConfig.mcpServerUrl.replace(/\/+$/, '');
+    const useTokenProxy = !!(oauthConfig.clientId && oauthConfig.clientSecret);
+
+    // Helper: resolve the auth server base URL for this request
+    const getAuthServerBase = (c: any): string => {
+      if (oauthConfig!.authorizationServerUrl) {
+        return oauthConfig!.authorizationServerUrl.replace(/\/+$/, '');
+      }
+      // Multi-tenant: derive from apiBaseUrl (set by tenant middleware)
+      return (c.get('apiBaseUrl') as string).replace(/\/+$/, '');
+    };
 
     // RFC 9728 — Protected Resource Metadata
     // Point authorization_servers at ourselves so that MCP clients fetch
@@ -263,21 +273,17 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
       });
     });
 
-    // Determine the token endpoint: proxy through our server when we have
-    // client credentials (so public MCP clients don't need the secret),
-    // otherwise point directly at Docebo.
-    const mcpBase = oauthConfig.mcpServerUrl.replace(/\/+$/, '');
-    const useTokenProxy = !!(oauthConfig.clientId && oauthConfig.clientSecret);
-    const tokenEndpoint = useTokenProxy
-      ? `${mcpBase}/oauth/token`
-      : `${authServerBase}/oauth2/token`;
-
     // RFC 8414 — Authorization Server Metadata
     // Served here because Docebo doesn't publish its own AS metadata.
     // This tells MCP clients where to find Docebo's authorize/token endpoints.
     app.get('/.well-known/oauth-authorization-server', (c) => {
+      const authServerBase = getAuthServerBase(c);
+      const tokenEndpoint = useTokenProxy
+        ? `${mcpBase}/oauth/token`
+        : `${authServerBase}/oauth2/token`;
+
       return c.json({
-        issuer: oauthConfig.authorizationServerUrl,
+        issuer: authServerBase,
         authorization_endpoint: `${authServerBase}/oauth2/authorize`,
         token_endpoint: tokenEndpoint,
         response_types_supported: ['code'],
@@ -287,38 +293,40 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
       });
     });
 
-    // Token proxy — accepts token requests from public MCP clients (no
-    // client_secret), injects the Docebo client credentials, and forwards
-    // the request to Docebo's token endpoint.
-    if (useTokenProxy) {
-      app.post('/oauth/token', async (c) => {
-        try {
-          const body = await c.req.text();
-          const params = new URLSearchParams(body);
+    // Token proxy — tenant-aware routing
+    // In single-tenant mode with credentials: injects client_id/secret (backward compat)
+    // In multi-tenant mode without credentials: pass-through (forwards client-provided credentials)
+    app.post('/oauth/token', async (c) => {
+      try {
+        const authServerBase = getAuthServerBase(c);
+        const body = await c.req.text();
+        const params = new URLSearchParams(body);
 
-          // Inject confidential client credentials
-          params.set('client_id', oauthConfig.clientId!);
-          params.set('client_secret', oauthConfig.clientSecret!);
-
-          console.error(`Token proxy: forwarding ${params.get('grant_type')} request to Docebo`);
-
-          const upstream = await fetch(`${authServerBase}/oauth2/token`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: params.toString(),
-          });
-
-          const responseBody = await upstream.text();
-          return new Response(responseBody, {
-            status: upstream.status,
-            headers: { 'Content-Type': upstream.headers.get('Content-Type') || 'application/json' },
-          });
-        } catch (err) {
-          console.error('Token proxy error:', err);
-          return c.json({ error: 'server_error', error_description: 'Token proxy failed' }, 500);
+        // In single-tenant mode with credentials configured, inject them
+        if (useTokenProxy) {
+          params.set('client_id', oauthConfig!.clientId!);
+          params.set('client_secret', oauthConfig!.clientSecret!);
         }
-      });
-    }
+        // In multi-tenant mode (no server-side credentials), forward as-is
+
+        console.error(`Token proxy: forwarding ${params.get('grant_type')} request to ${authServerBase}`);
+
+        const upstream = await fetch(`${authServerBase}/oauth2/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: params.toString(),
+        });
+
+        const responseBody = await upstream.text();
+        return new Response(responseBody, {
+          status: upstream.status,
+          headers: { 'Content-Type': upstream.headers.get('Content-Type') || 'application/json' },
+        });
+      } catch (err) {
+        console.error('Token proxy error:', err);
+        return c.json({ error: 'server_error', error_description: 'Token proxy failed' }, 500);
+      }
+    });
 
     // Bearer auth middleware for /mcp routes
     app.use('/mcp', async (c, next) => {
