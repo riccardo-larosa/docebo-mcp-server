@@ -121,8 +121,8 @@ export function createServer(): Server {
 
     // Resolve the bearer token from the transport (OAuth resource server flow)
     const authToken = extra?.authInfo?.token;
-    // Resolve the API base URL (set by tenant middleware)
-    const apiBaseUrl = extra?.apiBaseUrl as string | undefined;
+    // Resolve the API base URL (set by tenant middleware, threaded via authInfo)
+    const apiBaseUrl = (extra?.authInfo?.apiBaseUrl ?? extra?.apiBaseUrl) as string | undefined;
 
     // Class-based tools handle their own validation and execution
     if (entry instanceof BaseTool) {

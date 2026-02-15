@@ -9,7 +9,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { InitializeRequestSchema, JSONRPCError } from "@modelcontextprotocol/sdk/types.js";
 import { toReqRes, toFetchResponse } from 'fetch-to-node';
-
+import { resolveTenantApiBaseUrl } from './tenant.js';
 
 // Import server configuration constants
 import { SERVER_NAME, SERVER_VERSION } from './hono-index.js';
@@ -26,8 +26,8 @@ const JSON_RPC = "2.0";
 export interface OAuthResourceConfig {
   /** Public URL of this MCP server (e.g. "https://mcp.example.com") */
   mcpServerUrl: string;
-  /** Docebo instance URL acting as the OAuth authorization server */
-  authorizationServerUrl: string;
+  /** Docebo instance URL acting as the OAuth authorization server (undefined in multi-tenant mode) */
+  authorizationServerUrl?: string;
   /** OAuth client ID registered in Docebo */
   clientId?: string;
   /** OAuth client secret — needed to proxy the token exchange for public MCP clients */
@@ -40,6 +40,7 @@ export interface OAuthResourceConfig {
 type HonoEnv = {
   Variables: {
     bearerToken: string;
+    apiBaseUrl: string;
   };
 };
 
@@ -89,8 +90,13 @@ class MCPStreamableHttpServer {
       // If the auth middleware stored a bearer token, attach AuthInfo to the
       // Node.js request so the SDK propagates it as extra.authInfo to handlers.
       const bearerToken: string | undefined = c.get('bearerToken');
+      const apiBaseUrl: string | undefined = c.get('apiBaseUrl');
       if (bearerToken) {
-        (req as any).auth = { token: bearerToken, clientId: 'oauth', scopes: ['api'] };
+        (req as any).auth = { token: bearerToken, clientId: 'oauth', scopes: ['api'], apiBaseUrl };
+      } else {
+        // Even without a bearer token, thread apiBaseUrl through auth so the
+        // SDK passes it as extra.authInfo to tool handlers.
+        (req as any).auth = { apiBaseUrl };
       }
       
       // Reuse existing transport if we have a session ID
@@ -218,6 +224,18 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
   // Enable CORS
   app.use('*', cors());
 
+  // Tenant resolution middleware — sets apiBaseUrl on context
+  const apiBaseUrlEnv = process.env.API_BASE_URL;
+  app.use('*', async (c, next) => {
+    const host = c.req.header('host');
+    const apiBaseUrl = resolveTenantApiBaseUrl(host, apiBaseUrlEnv);
+    if (!apiBaseUrl) {
+      return c.text('Bad Request: cannot resolve tenant', 400);
+    }
+    c.set('apiBaseUrl', apiBaseUrl);
+    await next();
+  });
+
   // Create MCP handler
   const mcpHandler = new MCPStreamableHttpServer(serverFactory);
 
@@ -230,7 +248,7 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
   if (oauthConfig) {
     const resourceMetadataUrl = `${oauthConfig.mcpServerUrl.replace(/\/+$/, '')}/.well-known/oauth-protected-resource`;
 
-    const authServerBase = oauthConfig.authorizationServerUrl.replace(/\/+$/, '');
+    const authServerBase = oauthConfig.authorizationServerUrl?.replace(/\/+$/, '');
 
     // RFC 9728 — Protected Resource Metadata
     // Point authorization_servers at ourselves so that MCP clients fetch

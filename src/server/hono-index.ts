@@ -21,19 +21,21 @@ async function cleanup() {
  */
 async function main() {
   try {
-    // Build OAuth resource server config when both env vars are set
+    // Build OAuth resource server config
     let oauthConfig: OAuthResourceConfig | undefined;
     const mcpServerUrl = process.env.MCP_SERVER_URL;
-    const authServerUrl = process.env.DOCEBO_AUTH_SERVER_URL || process.env.API_BASE_URL;
+    const apiBaseUrl = process.env.API_BASE_URL;
 
-    if (mcpServerUrl && authServerUrl) {
+    if (mcpServerUrl) {
       oauthConfig = {
         mcpServerUrl,
-        authorizationServerUrl: authServerUrl,
+        // In single-tenant mode, use API_BASE_URL as auth server.
+        // In multi-tenant mode, authorizationServerUrl is undefined — derived per-request from tenant.
+        authorizationServerUrl: apiBaseUrl,
         clientId: process.env.DOCEBO_CLIENT_ID,
         clientSecret: process.env.DOCEBO_CLIENT_SECRET,
       };
-      console.error(`OAuth resource server enabled — AS: ${authServerUrl}`);
+      console.error(`OAuth resource server enabled${apiBaseUrl ? ` — AS: ${apiBaseUrl}` : ' — multi-tenant mode'}`);
       if (oauthConfig.clientId && oauthConfig.clientSecret) {
         console.error(`Token proxy enabled for client: ${oauthConfig.clientId}`);
       }
