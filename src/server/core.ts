@@ -21,6 +21,7 @@ import { LearnerDashboardTool } from './tools/workflows/learnerDashboard.js';
 import { TeamTrainingReportTool } from './tools/workflows/teamTrainingReport.js';
 import { EnrollUserByNameTool } from './tools/workflows/enrollUserByName.js';
 import { getPrompts, getPromptMessages } from './prompts/index.js';
+import { logger } from './logger.js';
 import './prompts/courseEnrollmentReport.js';
 import './prompts/learnerProgress.js';
 import './prompts/teamTrainingStatus.js';
@@ -118,24 +119,39 @@ export function createServer(): Server {
 
   server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest, extra?: any): Promise<CallToolResult> => {
     const { name: toolName, arguments: toolArgs } = request.params;
+    const start = Date.now();
+    const toolEvent: Record<string, unknown> = {
+      event: 'tool_call',
+      tool: toolName,
+    };
+
     const entry = toolDefinitionMap.get(toolName);
     if (!entry) {
-      console.error(`Error: Unknown tool requested: ${toolName}`);
+      toolEvent.outcome = 'unknown_tool';
+      toolEvent.duration_ms = Date.now() - start;
+      logger.error(toolEvent);
       return { content: [{ type: "text", text: `Error: Unknown tool requested: ${toolName}` }], isError: true };
     }
-    console.error(`Executing tool "${toolName}" with arguments ${JSON.stringify(toolArgs)}`);
 
     // Resolve the bearer token from the transport (OAuth resource server flow)
     const authToken = extra?.authInfo?.token;
     // Resolve the API base URL (set by tenant middleware, threaded via authInfo)
     const apiBaseUrl = (extra?.authInfo?.apiBaseUrl ?? extra?.apiBaseUrl) as string | undefined;
 
+    let result: CallToolResult;
+
     // Class-based tools handle their own validation and execution
     if (entry instanceof BaseTool) {
-      return entry.handleRequest(toolArgs ?? {}, authToken, apiBaseUrl);
+      result = await entry.handleRequest(toolArgs ?? {}, authToken, apiBaseUrl);
+    } else {
+      result = await executeApiTool(toolName, entry, toolArgs ?? {}, authToken, apiBaseUrl);
     }
 
-    return await executeApiTool(toolName, entry, toolArgs ?? {}, authToken, apiBaseUrl);
+    toolEvent.outcome = result.isError ? 'error' : 'success';
+    toolEvent.duration_ms = Date.now() - start;
+    logger.info(toolEvent);
+
+    return result;
   });
 
   return server;
@@ -210,9 +226,8 @@ async function executeApiTool(
     // Apply bearer token if available (from OAuth authInfo)
     if (bearerToken) {
       headers['authorization'] = `Bearer ${bearerToken}`;
-      console.error(`Applied Bearer token for outbound API call`);
     } else if (definition.securityRequirements?.length > 0) {
-      console.warn(`Tool '${toolName}' requires authentication, but no bearer token available.`);
+      logger.error({ event: 'tool_call', tool: toolName, error: 'missing_bearer_token' });
     }
 
     // Prepare the axios request configuration
@@ -225,9 +240,17 @@ async function executeApiTool(
       ...(requestBodyData !== undefined && { data: requestBodyData }),
     };
 
-    console.error(`Executing tool "${toolName}": ${config.method} ${config.url}`);
-
+    const apiStart = Date.now();
     const response = await axios(config);
+
+    logger.info({
+      event: 'docebo_api_call',
+      tool: toolName,
+      method: config.method,
+      path: pathPart,
+      status: response.status,
+      duration_ms: Date.now() - apiStart,
+    });
 
     // Extract response_format (consumed locally, not sent to API)
     const responseFormat = validatedArgs['response_format'] as string | undefined;
@@ -292,7 +315,7 @@ async function executeApiTool(
       errorMessage = 'Unexpected error: ' + String(error);
     }
 
-    console.error(`Error during execution of tool '${toolName}':`, errorMessage);
+    logger.error({ event: 'tool_call', tool: toolName, outcome: 'error', error: errorMessage });
     return { content: [{ type: "text", text: errorMessage }], isError: true };
   }
 }

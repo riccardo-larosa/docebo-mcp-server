@@ -10,6 +10,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { InitializeRequestSchema, JSONRPCError } from "@modelcontextprotocol/sdk/types.js";
 import { toReqRes, toFetchResponse } from 'fetch-to-node';
 import { resolveTenantApiBaseUrl } from './tenant.js';
+import { logger } from './logger.js';
 
 // Import server configuration constants
 import { SERVER_NAME, SERVER_VERSION } from './hono-index.js';
@@ -62,27 +63,24 @@ class MCPStreamableHttpServer {
   constructor(serverFactory: () => Server) {
     this.serverFactory = serverFactory;
   }
-  
+
   /**
    * Handle GET requests (typically used for static files)
    */
   async handleGetRequest(c: any) {
-    console.error("GET request received - StreamableHTTP transport only supports POST");
     return c.text('Method Not Allowed', 405, {
       'Allow': 'POST'
     });
   }
-  
+
   /**
    * Handle POST requests (all MCP communication)
    */
   async handlePostRequest(c: any) {
     const sessionId = c.req.header(SESSION_ID_HEADER_NAME);
-    console.error(`POST request received ${sessionId ? 'with session ID: ' + sessionId : 'without session ID'}`);
 
     try {
       const body = await c.req.json();
-      console.log(`Body: ${JSON.stringify(body)}`);
 
       // Convert Fetch Request to Node.js req/res
       const { req, res } = toReqRes(c.req.raw);
@@ -98,82 +96,83 @@ class MCPStreamableHttpServer {
         // SDK passes it as extra.authInfo to tool handlers.
         (req as any).auth = { apiBaseUrl };
       }
-      
+
       // Reuse existing transport if we have a session ID
       if (sessionId && this.transports[sessionId]) {
-        console.log(`Reusing existing transport for session ${sessionId}`);
         const transport = this.transports[sessionId];
-        
+
         // Handle the request with the transport
         await transport.handleRequest(req, res, body);
-        
-        // Cleanup when the response ends
-        res.on('close', () => {
-          console.error(`Request closed for session ${sessionId}`);
-        });
-        
+
         // Convert Node.js response back to Fetch Response
         return toFetchResponse(res);
       }
-      
+
       // Create new transport for initialize requests
       if (!sessionId && this.isInitializeRequest(body)) {
-        console.error("Creating new StreamableHTTP transport for initialize request");
-        
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => uuid(),
         });
-        
-        // Add error handler for debug purposes
+
+        // Add error handler
         transport.onerror = (err) => {
-          console.error('StreamableHTTP transport error:', err);
+          logger.error({ event: 'transport_error', error: String(err) });
         };
-        
+
         // Create a fresh Server instance for this session and connect it
         const sessionServer = this.serverFactory();
         await sessionServer.connect(transport);
-        
+
         // Handle the request with the transport
         await transport.handleRequest(req, res, body);
-        
+
         // Store the transport if we have a session ID
         const newSessionId = transport.sessionId;
         if (newSessionId) {
-          console.error(`New session established: ${newSessionId}`);
+          // Extract client name from initialize params
+          const initBody = Array.isArray(body) ? body[0] : body;
+          const clientName = initBody?.params?.clientInfo?.name;
+
+          logger.info({
+            event: 'session',
+            action: 'created',
+            session_id: newSessionId,
+            ...(clientName && { client: clientName }),
+          });
+
           this.transports[newSessionId] = transport;
           this.servers[newSessionId] = sessionServer;
 
           // Set up clean-up for when the transport is closed
           transport.onclose = () => {
-            console.error(`Session closed: ${newSessionId}`);
+            logger.info({ event: 'session', action: 'closed', session_id: newSessionId });
             delete this.transports[newSessionId];
             delete this.servers[newSessionId];
           };
         }
-        
-        // Cleanup when the response ends
-        res.on('close', () => {
-          console.error(`Request closed for new session`);
-        });
-        
+
         // Convert Node.js response back to Fetch Response
         return toFetchResponse(res);
       }
-      
+
       // Invalid request (no session ID and not initialize)
       return c.json(
         this.createErrorResponse("Bad Request: invalid session ID or method."),
         400
       );
     } catch (error) {
-      console.error('Error handling MCP request:', error);
+      logger.error({
+        event: 'mcp_request_error',
+        session_id: sessionId ?? null,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return c.json(
         this.createErrorResponse("Internal server error."),
         500
       );
     }
   }
-  
+
   /**
    * Create a JSON-RPC error response
    * @param message Error message
@@ -189,22 +188,19 @@ class MCPStreamableHttpServer {
       id: uuid(),
     };
   }
-  
+
   /**
    * Check if the request is an initialize request
    */
   private isInitializeRequest(body: any): boolean {
     const isInitial = (data: any) => {
-      console.error(`Checking if request is an initialize request: ${JSON.stringify(data)}`);
-      const result = InitializeRequestSchema.safeParse(data);
-      console.error(`Result: ${JSON.stringify(result)}`);
-      return result.success;
+      return InitializeRequestSchema.safeParse(data).success;
     };
-    
+
     if (Array.isArray(body)) {
       return body.some(request => isInitial(request));
     }
-    
+
     return isInitial(body);
   }
 }
@@ -261,9 +257,6 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
     };
 
     // RFC 9728 — Protected Resource Metadata
-    // Point authorization_servers at ourselves so that MCP clients fetch
-    // our /.well-known/oauth-authorization-server (which proxies/redirects
-    // to the real Docebo endpoints). Docebo doesn't serve RFC 8414 metadata.
     app.get('/.well-known/oauth-protected-resource', (c) => {
       return c.json({
         resource: oauthConfig.mcpServerUrl,
@@ -274,8 +267,6 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
     });
 
     // RFC 8414 — Authorization Server Metadata
-    // Served here because Docebo doesn't publish its own AS metadata.
-    // This tells MCP clients where to find Docebo's authorize/token endpoints.
     app.get('/.well-known/oauth-authorization-server', (c) => {
       const authServerBase = getAuthServerBase(c);
       const tokenEndpoint = useTokenProxy
@@ -294,9 +285,8 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
     });
 
     // Token proxy — tenant-aware routing
-    // In single-tenant mode with credentials: injects client_id/secret (backward compat)
-    // In multi-tenant mode without credentials: pass-through (forwards client-provided credentials)
     app.post('/oauth/token', async (c) => {
+      const start = Date.now();
       try {
         const authServerBase = getAuthServerBase(c);
         const body = await c.req.text();
@@ -307,9 +297,6 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
           params.set('client_id', oauthConfig!.clientId!);
           params.set('client_secret', oauthConfig!.clientSecret!);
         }
-        // In multi-tenant mode (no server-side credentials), forward as-is
-
-        console.error(`Token proxy: forwarding ${params.get('grant_type')} request to ${authServerBase}`);
 
         const upstream = await fetch(`${authServerBase}/oauth2/token`, {
           method: 'POST',
@@ -318,12 +305,24 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
         });
 
         const responseBody = await upstream.text();
+
+        logger.info({
+          event: 'token_proxy',
+          grant_type: params.get('grant_type'),
+          upstream_status: upstream.status,
+          duration_ms: Date.now() - start,
+        });
+
         return new Response(responseBody, {
           status: upstream.status,
           headers: { 'Content-Type': upstream.headers.get('Content-Type') || 'application/json' },
         });
       } catch (err) {
-        console.error('Token proxy error:', err);
+        logger.error({
+          event: 'token_proxy',
+          duration_ms: Date.now() - start,
+          error: err instanceof Error ? err.message : String(err),
+        });
         return c.json({ error: 'server_error', error_description: 'Token proxy failed' }, 500);
       }
     });
@@ -353,35 +352,32 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
   // Main MCP endpoint supporting both GET and POST
   app.get("/mcp", (c) => mcpHandler.handleGetRequest(c));
   app.post("/mcp", (c) => mcpHandler.handlePostRequest(c));
-  
+
   // Static files for the web client (if any)
   app.get('/*', async (c) => {
     const filePath = c.req.path === '/' ? '/index.html' : c.req.path;
     try {
-      // Use Node.js fs to serve static files
       const fs = await import('fs');
       const path = await import('path');
       const { fileURLToPath } = await import('url');
-      
+
       const __dirname = path.dirname(fileURLToPath(import.meta.url));
       const publicPath = path.join(__dirname, '..', 'public');
-      // console.log(`Serving static file from ${publicPath}`);
       const fullPath = path.join(publicPath, filePath);
-      // console.log(`Full path: ${fullPath}`);
       // Simple security check to prevent directory traversal
       if (!fullPath.startsWith(publicPath)) {
         return c.text('Forbidden', 403);
       }
-      
+
       try {
         const stat = fs.statSync(fullPath);
         if (stat.isFile()) {
           const content = fs.readFileSync(fullPath);
-          
+
           // Set content type based on file extension
           const ext = path.extname(fullPath).toLowerCase();
           let contentType = 'text/plain';
-          
+
           switch (ext) {
             case '.html': contentType = 'text/html'; break;
             case '.css': contentType = 'text/css'; break;
@@ -391,32 +387,35 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
             case '.jpg': contentType = 'image/jpeg'; break;
             case '.svg': contentType = 'image/svg+xml'; break;
           }
-          
+
           return new Response(content, {
             headers: { 'Content-Type': contentType }
           });
         }
       } catch (err) {
-        // File not found or other error
+        // File not found
         return c.text('Not Found', 404);
       }
     } catch (err) {
-      console.error('Error serving static file:', err);
+      logger.error({ event: 'static_file_error', path: filePath, error: String(err) });
       return c.text('Internal Server Error', 500);
     }
-    
+
     return c.text('Not Found', 404);
   });
-  
+
   // Start the server
   serve({
     fetch: app.fetch,
     port
   }, (info) => {
-    console.error(`MCP StreamableHTTP Server running at http://localhost:${info.port}`);
-    console.error(`- MCP Endpoint: http://localhost:${info.port}/mcp`);
-    console.error(`- Health Check: http://localhost:${info.port}/health`);
+    logger.info({
+      event: 'server_started',
+      port: info.port,
+      mcp_endpoint: `http://localhost:${info.port}/mcp`,
+      health_endpoint: `http://localhost:${info.port}/health`,
+    });
   });
-  
+
   return app;
 }

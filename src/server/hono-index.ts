@@ -1,5 +1,6 @@
 import { setupStreamableHttpServer, type OAuthResourceConfig } from "./hono-server.js";
 import { createServer, SERVER_NAME, SERVER_VERSION } from "./core.js";
+import { logger } from "./logger.js";
 
 import dotenv from 'dotenv';
 
@@ -12,7 +13,7 @@ export { SERVER_NAME, SERVER_VERSION };
  * Cleanup function for graceful shutdown
  */
 async function cleanup() {
-  console.error("Shutting down MCP server...");
+  logger.info({ event: 'server_shutdown' });
   process.exit(0);
 }
 
@@ -35,16 +36,18 @@ async function main() {
         clientId: process.env.DOCEBO_CLIENT_ID,
         clientSecret: process.env.DOCEBO_CLIENT_SECRET,
       };
-      console.error(`OAuth resource server enabled${apiBaseUrl ? ` — AS: ${apiBaseUrl}` : ' — multi-tenant mode'}`);
-      if (oauthConfig.clientId && oauthConfig.clientSecret) {
-        console.error(`Token proxy enabled for client: ${oauthConfig.clientId}`);
-      }
+      logger.info({
+        event: 'oauth_config',
+        mode: apiBaseUrl ? 'single-tenant' : 'multi-tenant',
+        ...(apiBaseUrl && { authorization_server: apiBaseUrl }),
+        token_proxy: !!(oauthConfig.clientId && oauthConfig.clientSecret),
+      });
     }
 
     const port = parseInt(process.env.PORT || '3000', 10);
     await setupStreamableHttpServer(() => createServer(), port, oauthConfig);
   } catch (error) {
-    console.error("Error setting up StreamableHTTP server:", error);
+    logger.error({ event: 'server_startup_error', error: error instanceof Error ? error.message : String(error) });
     process.exit(1);
   }
 }
@@ -55,6 +58,6 @@ process.on('SIGTERM', cleanup);
 
 // Start the server
 main().catch((error) => {
-  console.error("Fatal error in main execution:", error);
+  logger.error({ event: 'fatal_error', error: error instanceof Error ? error.message : String(error) });
   process.exit(1);
 });
