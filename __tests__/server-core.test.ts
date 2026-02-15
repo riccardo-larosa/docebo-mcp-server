@@ -109,6 +109,23 @@ describe('Server Core — ListTools handler', () => {
     expect(toolWithAnnotations).toBeDefined();
     expect(toolWithAnnotations.annotations).toHaveProperty('readOnlyHint');
   });
+
+  it('should include workflow tools in listing', async () => {
+    const result = await listToolsHandler();
+    const toolNames = result.tools.map((t: any) => t.name);
+    expect(toolNames).toContain('get_learner_dashboard');
+    expect(toolNames).toContain('get_team_training_report');
+    expect(toolNames).toContain('enroll_user_by_name');
+  });
+
+  it('should return correct annotations for workflow tools', async () => {
+    const result = await listToolsHandler();
+    const dashboard = result.tools.find((t: any) => t.name === 'get_learner_dashboard');
+    expect(dashboard.annotations.readOnlyHint).toBe(true);
+
+    const enroll = result.tools.find((t: any) => t.name === 'enroll_user_by_name');
+    expect(enroll.annotations.readOnlyHint).toBe(false);
+  });
 });
 
 describe('Server Core — ListPrompts handler', () => {
@@ -611,6 +628,88 @@ describe('Server Core — New tools in ListTools', () => {
     const toolNames = result.tools.map((t: any) => t.name);
     expect(toolNames).toContain('list_users');
     expect(toolNames).toContain('get_user');
+  });
+});
+
+describe('Server Core — Workflow tools via CallTool', () => {
+  let callToolHandler: Function;
+
+  const authExtra = { authInfo: { token: 'test-token-123', apiBaseUrl: 'https://example.docebosaas.com' } };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    registeredHandlers.clear();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    createServer();
+    callToolHandler = registeredHandlers.get(CallToolRequestSchema)!;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should execute get_learner_dashboard workflow tool', async () => {
+    // Mock user profile
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { user_id: 42, username: 'jdoe', first_name: 'Jane', last_name: 'Doe', email: 'jane@acme.com' } },
+    });
+    // Mock enrollments
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { items: [
+        { id_course: 10, course_name: 'Compliance', status: 'completed', completion_percentage: 100, score: 90 },
+      ] } },
+    });
+
+    const result = await callToolHandler({
+      params: { name: 'get_learner_dashboard', arguments: { user_id: '42' } },
+    }, authExtra);
+
+    expect(result.isError).toBeUndefined();
+    const data = JSON.parse(result.content[0].text);
+    expect(data.user.username).toBe('jdoe');
+    expect(data.enrollments).toHaveLength(1);
+  });
+
+  it('should execute enroll_user_by_name workflow tool', async () => {
+    // Mock user search
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { items: [
+        { user_id: 42, username: 'jdoe', first_name: 'Jane', last_name: 'Doe', email: 'jane@acme.com' },
+      ] } },
+    });
+    // Mock course search
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { items: [
+        { id_course: 10, name: 'Compliance 101', status: 'published' },
+      ] } },
+    });
+    // Mock enrollment
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { success: true } },
+    });
+
+    const result = await callToolHandler({
+      params: { name: 'enroll_user_by_name', arguments: { user_search: 'Jane', course_search: 'Compliance' } },
+    }, authExtra);
+
+    expect(result.isError).toBeUndefined();
+    const data = JSON.parse(result.content[0].text);
+    expect(data.enrolled).toBe(true);
+  });
+
+  it('should return validation error for workflow tool with missing required args', async () => {
+    const result = await callToolHandler({
+      params: { name: 'get_learner_dashboard', arguments: {} },
+    }, authExtra);
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('user_id');
   });
 });
 

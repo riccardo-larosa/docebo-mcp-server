@@ -80,4 +80,60 @@ describe('LearnerDashboardTool', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('API base URL');
   });
+
+  it('should handle user with no enrollments', async () => {
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { user_id: 42, username: 'jdoe', first_name: 'Jane', last_name: 'Doe', email: 'jane@acme.com' } },
+    });
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { items: [] } },
+    });
+
+    const result = await tool.handleRequest({ user_id: '42' }, token, apiBaseUrl);
+
+    expect(result.isError).toBeUndefined();
+    const data = JSON.parse(result.content[0].text);
+    expect(data.enrollments).toHaveLength(0);
+    expect(data.total_enrollments).toBe(0);
+  });
+
+  it('should use fallback fields for enrollment data', async () => {
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { user_id: 42, username: 'jdoe', first_name: 'Jane', last_name: 'Doe', email: 'jane@acme.com' } },
+    });
+    // Enrollment uses `name` instead of `course_name`, `completion` instead of `completion_percentage`
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { items: [
+        { id_course: 10, name: 'Safety Training', status: 'completed', completion: 100, score: 88 },
+      ] } },
+    });
+
+    const result = await tool.handleRequest({ user_id: '42' }, token, apiBaseUrl);
+
+    const data = JSON.parse(result.content[0].text);
+    expect(data.enrollments[0].course_name).toBe('Safety Training');
+    expect(data.enrollments[0].completion_percentage).toBe(100);
+  });
+
+  it('should handle API response without nested data wrapper', async () => {
+    // Some endpoints return data directly without the nested .data wrapper
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { user_id: 42, username: 'jdoe', first_name: 'Jane', last_name: 'Doe', email: 'jane@acme.com' },
+    });
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { items: [] } },
+    });
+
+    const result = await tool.handleRequest({ user_id: '42' }, token, apiBaseUrl);
+
+    expect(result.isError).toBeUndefined();
+    const data = JSON.parse(result.content[0].text);
+    expect(data.user.username).toBe('jdoe');
+  });
 });

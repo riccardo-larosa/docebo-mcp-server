@@ -106,4 +106,106 @@ describe('TeamTrainingReportTool', () => {
     const result = await tool.handleRequest({}, undefined, apiBaseUrl);
     expect(result.isError).toBe(true);
   });
+
+  it('should handle missing apiBaseUrl', async () => {
+    const result = await tool.handleRequest({}, token, undefined);
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('API base URL');
+  });
+
+  it('should pass search_text to user API', async () => {
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { items: [] } },
+    });
+
+    await tool.handleRequest({ search_text: 'engineering' }, token, apiBaseUrl);
+
+    const config = mockAxios.mock.calls[0][0];
+    expect(config.params.search_text).toBe('engineering');
+  });
+
+  it('should return N/A completion rate when no enrollments match', async () => {
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { items: [
+        { user_id: 1, username: 'alice', first_name: 'Alice', last_name: 'A', email: 'alice@acme.com' },
+      ] } },
+    });
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { items: [] } },
+    });
+
+    const result = await tool.handleRequest({}, token, apiBaseUrl);
+
+    const data = JSON.parse(result.content[0].text);
+    expect(data.rows).toHaveLength(0);
+    expect(data.summary.completion_rate).toBe('N/A');
+  });
+
+  it('should fall back to username when first/last name missing', async () => {
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { items: [
+        { user_id: 1, username: 'sysadmin', email: 'admin@acme.com' },
+      ] } },
+    });
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { items: [
+        { id_course: 10, course_name: 'Compliance', status: 'completed', completion_percentage: 100, score: 85 },
+      ] } },
+    });
+
+    const result = await tool.handleRequest({}, token, apiBaseUrl);
+
+    const data = JSON.parse(result.content[0].text);
+    expect(data.rows[0].user_name).toBe('sysadmin');
+  });
+
+  it('should use fallback enrollment fields (name, completion)', async () => {
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { items: [
+        { user_id: 1, username: 'alice', first_name: 'Alice', last_name: 'A', email: 'alice@acme.com' },
+      ] } },
+    });
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { items: [
+        { id_course: 10, name: 'Safety 101', status: 'completed', completion: 100, score: 90 },
+      ] } },
+    });
+
+    const result = await tool.handleRequest({}, token, apiBaseUrl);
+
+    const data = JSON.parse(result.content[0].text);
+    expect(data.rows[0].course_name).toBe('Safety 101');
+    expect(data.rows[0].completion_percentage).toBe(100);
+  });
+
+  it('should apply both course_name and status filters together', async () => {
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { items: [
+        { user_id: 1, username: 'alice', first_name: 'Alice', last_name: 'A', email: 'alice@acme.com' },
+      ] } },
+    });
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { items: [
+        { id_course: 10, course_name: 'Compliance 101', status: 'completed', completion_percentage: 100, score: 95 },
+        { id_course: 11, course_name: 'Compliance 201', status: 'in_progress', completion_percentage: 30, score: null },
+        { id_course: 20, course_name: 'Leadership', status: 'completed', completion_percentage: 100, score: 88 },
+      ] } },
+    });
+
+    const result = await tool.handleRequest({ course_name: 'Compliance', status: 'completed' }, token, apiBaseUrl);
+
+    const data = JSON.parse(result.content[0].text);
+    expect(data.rows).toHaveLength(1);
+    expect(data.rows[0].course_name).toBe('Compliance 101');
+    expect(data.rows[0].status).toBe('completed');
+  });
 });

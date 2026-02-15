@@ -151,4 +151,101 @@ describe('EnrollUserByNameTool', () => {
     }, undefined, apiBaseUrl);
     expect(result.isError).toBe(true);
   });
+
+  it('should handle missing apiBaseUrl', async () => {
+    const result = await tool.handleRequest({
+      user_search: 'Jane',
+      course_search: 'Compliance',
+    }, token, undefined);
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('API base URL');
+  });
+
+  it('should pass level parameter when provided', async () => {
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { items: [
+        { user_id: 42, username: 'jdoe', first_name: 'Jane', last_name: 'Doe', email: 'jane@acme.com' },
+      ] } },
+    });
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { items: [
+        { id_course: 10, name: 'Compliance 101', status: 'published' },
+      ] } },
+    });
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { success: true } },
+    });
+
+    await tool.handleRequest({
+      user_search: 'Jane',
+      course_search: 'Compliance',
+      level: 3,
+    }, token, apiBaseUrl);
+
+    const postCall = mockAxios.mock.calls[2][0];
+    expect(postCall.data).toEqual({ level: 3 });
+  });
+
+  it('should not send body when level is not provided', async () => {
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { items: [
+        { user_id: 42, username: 'jdoe', first_name: 'Jane', last_name: 'Doe', email: 'jane@acme.com' },
+      ] } },
+    });
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { items: [
+        { id_course: 10, name: 'Compliance 101', status: 'published' },
+      ] } },
+    });
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { success: true } },
+    });
+
+    await tool.handleRequest({
+      user_search: 'Jane',
+      course_search: 'Compliance',
+    }, token, apiBaseUrl);
+
+    const postCall = mockAxios.mock.calls[2][0];
+    expect(postCall.data).toBeUndefined();
+  });
+
+  it('should fall back to username when first/last name missing', async () => {
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { items: [
+        { user_id: 42, username: 'sysadmin', email: 'admin@acme.com' },
+      ] } },
+    });
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { items: [
+        { id_course: 10, name: 'Compliance 101', status: 'published' },
+      ] } },
+    });
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: { data: { success: true } },
+    });
+
+    const result = await tool.handleRequest({
+      user_search: 'sysadmin',
+      course_search: 'Compliance',
+    }, token, apiBaseUrl);
+
+    const data = JSON.parse(result.content[0].text);
+    expect(data.user.name).toBe('sysadmin');
+  });
+
+  it('should require both user_search and course_search', async () => {
+    const result = await tool.handleRequest({ user_search: 'Jane' }, token, apiBaseUrl);
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('course_search');
+  });
 });

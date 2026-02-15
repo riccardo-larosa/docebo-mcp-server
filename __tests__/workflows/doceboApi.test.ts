@@ -63,6 +63,40 @@ describe('DoceboApiClient', () => {
 
       await expect(client.get('learn/v1/courses/999')).rejects.toThrow('404');
     });
+
+    it('should rethrow non-axios errors', async () => {
+      mockAxios.mockRejectedValue(new TypeError('Network failure'));
+
+      await expect(client.get('learn/v1/courses')).rejects.toThrow('Network failure');
+    });
+
+    it('should strip trailing slashes from base URL', async () => {
+      const c = new DoceboApiClient('tok', 'https://acme.docebosaas.com///');
+      mockAxios.mockResolvedValue({ status: 200, data: {} });
+
+      await c.get('learn/v1/courses');
+
+      const config = mockAxios.mock.calls[0][0];
+      expect(config.url).toBe('https://acme.docebosaas.com/learn/v1/courses');
+    });
+
+    it('should strip leading slashes from path', async () => {
+      mockAxios.mockResolvedValue({ status: 200, data: {} });
+
+      await client.get('/learn/v1/courses');
+
+      const config = mockAxios.mock.calls[0][0];
+      expect(config.url).toBe('https://acme.docebosaas.com/learn/v1/courses');
+    });
+
+    it('should format error with string response data', async () => {
+      const error = new Error('fail') as any;
+      error.isAxiosError = true;
+      error.response = { status: 500, statusText: 'Internal Server Error', data: 'something broke' };
+      mockAxios.mockRejectedValue(error);
+
+      await expect(client.get('fail')).rejects.toThrow('something broke');
+    });
   });
 
   describe('post', () => {
@@ -76,6 +110,17 @@ describe('DoceboApiClient', () => {
       expect(config.url).toBe('https://acme.docebosaas.com/learn/v1/enrollments/1/2');
       expect(config.data).toEqual({ level: 3 });
       expect(config.headers['Content-Type']).toBe('application/json');
+    });
+
+    it('should make POST request without body', async () => {
+      mockAxios.mockResolvedValue({ status: 200, data: { success: true } });
+
+      await client.post('learn/v1/enrollments/1/2');
+
+      const config = mockAxios.mock.calls[0][0];
+      expect(config.method).toBe('POST');
+      expect(config.headers['Content-Type']).toBeUndefined();
+      expect(config.data).toBeUndefined();
     });
   });
 });
