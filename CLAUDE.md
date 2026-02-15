@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Remote MCP (Model Context Protocol) server that bridges Claude/MCP clients to the Docebo Learning Platform API. Uses StreamableHTTP transport over Hono with OAuth 2.0 authentication. Tool definitions translate to Docebo REST API calls.
+Remote MCP (Model Context Protocol) server that bridges Claude/MCP clients to the Docebo Learning Platform API. Uses StreamableHTTP transport over Hono with OAuth 2.0 authentication. Supports multi-tenant deployment via subdomain routing (`{tenant}.mcp.yourdomain.com` → `{tenant}.docebosaas.com`). Tool definitions translate to Docebo REST API calls.
 
 ## Commands
 
@@ -33,12 +33,14 @@ npm run coverage                        # Run tests with coverage report
 
 **hono-index.ts** — Entry point. Configures OAuth resource server settings and starts the HTTP server.
 
+**tenant.ts** — Tenant resolution logic. `extractTenant(host)` parses the tenant slug from a `Host` header subdomain. `resolveTenantApiBaseUrl(host, apiBaseUrlEnv)` returns `API_BASE_URL` if set (single-tenant), otherwise constructs `https://{tenant}.docebosaas.com` (multi-tenant).
+
 **core.ts** — Creates the MCP Server instance and registers protocol handlers:
 - `ListToolsRequestSchema` / `ListPromptsRequestSchema` — Returns available tools/prompts
-- `CallToolRequestSchema` — Executes a tool by: validating args against Zod schemas, binding path/query/header parameters to the URL template, applying the bearer token from OAuth, and making the HTTP request via axios.
+- `CallToolRequestSchema` — Executes a tool by: validating args against Zod schemas, binding path/query/header parameters to the URL template, applying the bearer token and `apiBaseUrl` from the request context, and making the HTTP request via axios.
 - `GetPromptRequestSchema` — Returns prompt messages with argument interpolation.
 
-**hono-server.ts** — HTTP transport layer. `MCPStreamableHttpServer` class wraps Hono to manage MCP sessions tracked via `mcp-session-id` header. Endpoints: `POST /mcp` (all MCP requests), `GET /health` (health check).
+**hono-server.ts** — HTTP transport layer. `MCPStreamableHttpServer` class wraps Hono to manage MCP sessions tracked via `mcp-session-id` header. Includes tenant resolution middleware (sets `apiBaseUrl` per-request) and tenant-aware OAuth endpoints. Endpoints: `POST /mcp` (all MCP requests), `GET /health` (health check).
 
 **auth.ts** — In-memory token registry with `registerToken()`/`validateBearerToken()`. Used for authenticating MCP client connections to this server.
 
@@ -52,12 +54,33 @@ npm run coverage                        # Run tests with coverage report
 
 - **Tool definitions are data, not code** — Each tool is a declarative object with JSON Schema, HTTP method, path template, and parameter bindings. The execution engine in core.ts is generic.
 - **Bearer token flow** — Token comes from `extra.authInfo` (set by the OAuth auth middleware) and is passed directly to `executeApiTool`. No env var token storage.
+- **Multi-tenant routing** — `apiBaseUrl` is resolved per-request by the tenant middleware (from `Host` subdomain or `API_BASE_URL` fallback), threaded via `req.auth.apiBaseUrl` → `extra.authInfo.apiBaseUrl` → `executeApiTool()`. No global state.
+- **Token proxy** — In single-tenant mode with `DOCEBO_CLIENT_ID`/`SECRET`, injects credentials (for public MCP clients). In multi-tenant mode, acts as pass-through forwarding client-provided credentials to the correct tenant's `/oauth2/token`.
 - **Session management** — Each MCP client connection gets its own `Server` instance (via factory function) and `StreamableHTTPServerTransport`, tracked by UUID in the `mcp-session-id` HTTP header.
 
 ## Environment Variables
 
-Required: `API_BASE_URL` — Docebo instance URL, `MCP_SERVER_URL` — public URL of this server.
-Optional: `DOCEBO_CLIENT_ID`/`DOCEBO_CLIENT_SECRET` (enables token proxy for public MCP clients), `PORT` (default 3000).
+### Single-tenant mode (dev)
+
+| Variable | Required | Description |
+|---|---|---|
+| `API_BASE_URL` | Yes | Docebo instance URL (e.g. `https://acme.docebosaas.com`) |
+| `MCP_SERVER_URL` | Yes | Public URL of this server (e.g. ngrok URL) |
+| `DOCEBO_CLIENT_ID` | Optional | Enables token proxy with credential injection |
+| `DOCEBO_CLIENT_SECRET` | Optional | Enables token proxy with credential injection |
+| `PORT` | Optional | Server port (default 3000) |
+
+### Multi-tenant mode (prod)
+
+| Variable | Required | Description |
+|---|---|---|
+| `API_BASE_URL` | **Unset** | Tenant derived from `Host` subdomain instead |
+| `MCP_SERVER_URL` | Yes | Public URL (e.g. `https://mcp.yourdomain.com`) |
+| `DOCEBO_CLIENT_ID` | **Unset** | Token proxy acts as pass-through |
+| `DOCEBO_CLIENT_SECRET` | **Unset** | Token proxy acts as pass-through |
+| `PORT` | Optional | Server port (default 3000) |
+
+Multi-tenant activates when `API_BASE_URL` is not set. Requests to `acme.mcp.yourdomain.com` route API calls to `https://acme.docebosaas.com`.
 
 ## Tech Stack
 
