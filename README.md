@@ -46,23 +46,27 @@ claude mcp add docebo --transport http https://your-server-url.example.com/mcp
 
 Once set up, try these example prompts:
 
-### Track Learner Progress
+### Learner Dashboard
 
-- Show me the progress for user 12345 across all their courses.
-- Which courses has Jane Smith not completed yet?
-- Summarize the enrollment status for the "Onboarding" course.
+- Show me the full dashboard for user 12345.
+- What courses has Jane Smith completed and what's still in progress?
 
-### Manage Enrollments
+### Team Training Reports
 
-- Enroll user 12345 in the "Compliance Training" course.
-- List all enrollments for course 456.
-- Remove user 67890 from the "Leadership Workshop" course.
+- Give me a training report for the whole team.
+- Show completion status for the "Compliance" training across all users.
+- Which team members haven't completed their required courses?
 
-### Search Courses
+### Enroll by Name
+
+- Enroll Jane Doe in the Compliance 101 course.
+- Sign up John Smith for Leadership Training.
+
+### Search and Browse
 
 - Find all courses related to "leadership".
 - Show me the details for course 456.
-- List courses sorted by name.
+- List all enrollments for course 456.
 
 ### Send Notifications
 
@@ -71,46 +75,70 @@ Once set up, try these example prompts:
 
 ## Tools
 
+### Workflow Tools
+
+High-level tools that combine multiple API calls into a single operation:
+
+| Tool | Description |
+|------|-------------|
+| `get_learner_dashboard` | Returns user profile + all course enrollments with progress in one call |
+| `get_team_training_report` | Generates a team-wide training report with filters (search, course, status) |
+| `enroll_user_by_name` | Enrolls a user in a course by name — no IDs needed. Returns candidates if ambiguous |
+
 ### Courses
 
-| Tool | Method | Description |
-|------|--------|-------------|
-| `list-all-courses` | GET | List and search courses with filters (name, category, status, sorting) |
-| `get-a-course` | GET | Get full details for a single course by ID |
+| Tool | Description |
+|------|-------------|
+| `list_courses` | List and search courses with filters (name, category, status, sorting) |
+| `get_course` | Get full details for a single course by ID |
 
 ### Enrollments
 
-| Tool | Method | Description |
-|------|--------|-------------|
-| `list-enrollments` | GET | List enrollments with optional user/course/status filters |
-| `get-enrollment-details` | GET | Get detailed enrollment info for a specific course + user |
-| `get-user-progress` | GET | Get all enrollments for a user (progress summary) |
-| `enroll-user` | POST | Enroll a user into a course |
-| `unenroll-user` | DELETE | Remove a user's enrollment from a course |
+| Tool | Description |
+|------|-------------|
+| `list_enrollments` | List enrollments with optional user/course/status filters |
+| `get_enrollment_details` | Get detailed enrollment info for a specific course + user |
+| `get_user_progress` | Get all enrollments for a user (progress summary) |
+| `enroll_user` | Enroll a user into a course |
+| `unenroll_user` | Remove a user's enrollment from a course |
 
 ### Users
 
-| Tool | Method | Description |
-|------|--------|-------------|
-| `list-users` | GET | List platform users with pagination |
-| `get-user` | GET | Get details for a single user by ID |
+| Tool | Description |
+|------|-------------|
+| `list_users` | List platform users with pagination |
+| `get_user` | Get details for a single user by ID |
 
 ### Notifications
 
-| Tool | Method | Description |
-|------|--------|-------------|
-| `send-training-reminder` | POST | Send a custom email to a user |
-| `send-learning-plan-notification` | POST | Trigger a learning plan notification for a user |
+| Tool | Description |
+|------|-------------|
+| `send_training_reminder` | Send a custom email to a user |
+| `send_learning_plan_notification` | Trigger a learning plan notification for a user |
 
 ## Environment Variables
+
+### Single-tenant mode (development)
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `API_BASE_URL` | Yes | Your Docebo instance URL (e.g., `https://your-instance.docebosaas.com`) |
-| `MCP_SERVER_URL` | Yes | Public URL of this server (enables OAuth resource server) |
-| `DOCEBO_CLIENT_ID` | No | OAuth client ID (enables token proxy for public MCP clients) |
-| `DOCEBO_CLIENT_SECRET` | No | OAuth client secret (enables token proxy for public MCP clients) |
+| `MCP_SERVER_URL` | Yes | Public URL of this server (e.g. ngrok URL) |
+| `DOCEBO_CLIENT_ID` | No | OAuth client ID (enables token proxy with credential injection) |
+| `DOCEBO_CLIENT_SECRET` | No | OAuth client secret (enables token proxy with credential injection) |
 | `PORT` | No | Server port (default: 3000) |
+
+### Multi-tenant mode (production)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `API_BASE_URL` | **Unset** | Tenant derived from `Host` subdomain instead |
+| `MCP_SERVER_URL` | Yes | Public URL (e.g. `https://mcp.yourdomain.com`) |
+| `DOCEBO_CLIENT_ID` | **Unset** | Token proxy acts as pass-through |
+| `DOCEBO_CLIENT_SECRET` | **Unset** | Token proxy acts as pass-through |
+| `PORT` | No | Server port (default: 3000) |
+
+Multi-tenant activates when `API_BASE_URL` is not set. Requests to `acme.mcp.yourdomain.com` route API calls to `https://acme.docebosaas.com`.
 
 ## Development
 
@@ -122,9 +150,7 @@ The server listens on port 3000 by default and exposes the MCP endpoint at `/mcp
 
 #### HTTP API
 
-- **POST `/mcp`** — Client requests (including `initialize`)
-- **GET `/mcp`** — SSE connection for server-to-client notifications
-- **DELETE `/mcp`** — Terminate the MCP session
+- **POST `/mcp`** — All MCP client requests (including `initialize`)
 - **GET `/health`** — Health check
 
 Sessions are tracked via the `mcp-session-id` HTTP header.
@@ -166,4 +192,7 @@ graph LR
   style API1 fill:#c2185b,color:#ffffff
 ```
 
-Tool definitions are declarative data structures (not code). Each tool specifies an HTTP method, path template, parameter bindings, and JSON Schema. The execution engine in `core.ts` handles validation, URL construction, auth, and HTTP calls generically.
+The server has two types of tools:
+
+- **Declarative tools** — Data structures (HTTP method, path template, parameter bindings, JSON Schema). The generic execution engine in `core.ts` handles validation, URL construction, auth, and HTTP calls.
+- **Workflow tools** — Class-based tools that combine multiple API calls into a single operation. Each extends `BaseTool` and uses `DoceboApiClient` for internal HTTP calls.
