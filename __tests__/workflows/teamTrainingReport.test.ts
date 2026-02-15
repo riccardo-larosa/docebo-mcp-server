@@ -25,8 +25,14 @@ describe('TeamTrainingReportTool', () => {
     expect(def.annotations?.readOnlyHint).toBe(true);
   });
 
-  it('should return aggregated report for multiple users', async () => {
-    // Mock list users
+  it('should require manager_id', async () => {
+    const result = await tool.handleRequest({}, token, apiBaseUrl);
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('manager_id');
+  });
+
+  it('should fetch subordinates and return aggregated report', async () => {
+    // Mock GET /manage/v1/user/{manager_id}/subordinates
     mockAxios.mockResolvedValueOnce({
       status: 200,
       data: { data: { items: [
@@ -49,13 +55,17 @@ describe('TeamTrainingReportTool', () => {
       ] } },
     });
 
-    const result = await tool.handleRequest({}, token, apiBaseUrl);
+    const result = await tool.handleRequest({ manager_id: '100' }, token, apiBaseUrl);
 
     expect(result.isError).toBeUndefined();
     const data = JSON.parse(result.content[0].text);
     expect(data.rows).toHaveLength(2);
     expect(data.rows[0].user_name).toContain('Alice');
     expect(data.summary.total_users).toBe(2);
+
+    // Verify it called the subordinates endpoint
+    const firstCall = mockAxios.mock.calls[0][0];
+    expect(firstCall.url).toContain('manage/v1/user/100/subordinates');
   });
 
   it('should filter by course_name', async () => {
@@ -73,7 +83,7 @@ describe('TeamTrainingReportTool', () => {
       ] } },
     });
 
-    const result = await tool.handleRequest({ course_name: 'Compliance' }, token, apiBaseUrl);
+    const result = await tool.handleRequest({ manager_id: '100', course_name: 'Compliance' }, token, apiBaseUrl);
 
     const data = JSON.parse(result.content[0].text);
     expect(data.rows).toHaveLength(1);
@@ -95,7 +105,7 @@ describe('TeamTrainingReportTool', () => {
       ] } },
     });
 
-    const result = await tool.handleRequest({ status: 'completed' }, token, apiBaseUrl);
+    const result = await tool.handleRequest({ manager_id: '100', status: 'completed' }, token, apiBaseUrl);
 
     const data = JSON.parse(result.content[0].text);
     expect(data.rows).toHaveLength(1);
@@ -103,26 +113,29 @@ describe('TeamTrainingReportTool', () => {
   });
 
   it('should handle missing token', async () => {
-    const result = await tool.handleRequest({}, undefined, apiBaseUrl);
+    const result = await tool.handleRequest({ manager_id: '100' }, undefined, apiBaseUrl);
     expect(result.isError).toBe(true);
   });
 
   it('should handle missing apiBaseUrl', async () => {
-    const result = await tool.handleRequest({}, token, undefined);
+    const result = await tool.handleRequest({ manager_id: '100' }, token, undefined);
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('API base URL');
   });
 
-  it('should pass search_text to user API', async () => {
+  it('should return helpful message when no subordinates found', async () => {
     mockAxios.mockResolvedValueOnce({
       status: 200,
       data: { data: { items: [] } },
     });
 
-    await tool.handleRequest({ search_text: 'engineering' }, token, apiBaseUrl);
+    const result = await tool.handleRequest({ manager_id: '100' }, token, apiBaseUrl);
 
-    const config = mockAxios.mock.calls[0][0];
-    expect(config.params.search_text).toBe('engineering');
+    expect(result.isError).toBeUndefined();
+    const data = JSON.parse(result.content[0].text);
+    expect(data.rows).toHaveLength(0);
+    expect(data.summary.total_users).toBe(0);
+    expect(data.summary.message).toContain('No subordinates');
   });
 
   it('should return N/A completion rate when no enrollments match', async () => {
@@ -137,7 +150,7 @@ describe('TeamTrainingReportTool', () => {
       data: { data: { items: [] } },
     });
 
-    const result = await tool.handleRequest({}, token, apiBaseUrl);
+    const result = await tool.handleRequest({ manager_id: '100' }, token, apiBaseUrl);
 
     const data = JSON.parse(result.content[0].text);
     expect(data.rows).toHaveLength(0);
@@ -158,7 +171,7 @@ describe('TeamTrainingReportTool', () => {
       ] } },
     });
 
-    const result = await tool.handleRequest({}, token, apiBaseUrl);
+    const result = await tool.handleRequest({ manager_id: '100' }, token, apiBaseUrl);
 
     const data = JSON.parse(result.content[0].text);
     expect(data.rows[0].user_name).toBe('sysadmin');
@@ -178,7 +191,7 @@ describe('TeamTrainingReportTool', () => {
       ] } },
     });
 
-    const result = await tool.handleRequest({}, token, apiBaseUrl);
+    const result = await tool.handleRequest({ manager_id: '100' }, token, apiBaseUrl);
 
     const data = JSON.parse(result.content[0].text);
     expect(data.rows[0].course_name).toBe('Safety 101');
@@ -201,7 +214,7 @@ describe('TeamTrainingReportTool', () => {
       ] } },
     });
 
-    const result = await tool.handleRequest({ course_name: 'Compliance', status: 'completed' }, token, apiBaseUrl);
+    const result = await tool.handleRequest({ manager_id: '100', course_name: 'Compliance', status: 'completed' }, token, apiBaseUrl);
 
     const data = JSON.parse(result.content[0].text);
     expect(data.rows).toHaveLength(1);
