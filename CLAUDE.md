@@ -50,9 +50,24 @@ npm run coverage                        # Run tests with coverage report
 
 **courses.ts / enrollments.ts / users.ts / notifications.ts** — Tool definition maps (`Map<string, McpToolDefinition>`) for Docebo API endpoints. Adding new tools means creating a new map file and registering it in core.ts.
 
+**baseTool.ts** — Abstract base class for class-based tools. Provides built-in Zod validation, error handling, and standard `CallToolResult` formatting. Subclass and implement `process()`.
+
+**doceboApi.ts** — `DoceboApiClient` — lightweight HTTP client for workflow tools. Wraps axios with `get<T>(path, params?)` and `post<T>(path, body?)` methods, auto-injecting auth headers, 30s timeout, and descriptive error formatting.
+
+### Workflow Tools (`src/server/tools/workflows/`)
+
+Workflow tools extend `BaseTool` and use `DoceboApiClient` to collapse multi-step API patterns into single calls. They are registered alongside declarative tools in `core.ts`.
+
+**learnerDashboard.ts** — `get_learner_dashboard` (readOnly). Input: `user_id`. Fetches user profile + all enrollments in two API calls. Returns structured dashboard with user info and enriched enrollment list.
+
+**teamTrainingReport.ts** — `get_team_training_report` (readOnly). Input: optional `search_text`, `course_name`, `status`. Fetches up to 50 users and their enrollments, applies filters, returns flat rows + summary stats (completion rate).
+
+**enrollUserByName.ts** — `enroll_user_by_name` (mutating). Input: `user_search`, `course_search`, optional `level`. Searches user and course by name. If exactly one match each, enrolls automatically. If ambiguous, returns candidate list without enrolling.
+
 ### Key Patterns
 
-- **Tool definitions are data, not code** — Each tool is a declarative object with JSON Schema, HTTP method, path template, and parameter bindings. The execution engine in core.ts is generic.
+- **Two tool types** — Declarative tools (`McpToolDefinition`) are data-driven API wrappers executed by the generic engine in core.ts. Workflow tools (`BaseTool` subclasses) contain imperative logic for multi-step operations. Both registered in `toolDefinitionMap`.
+- **Tool definitions are data, not code** — Each declarative tool is an object with JSON Schema, HTTP method, path template, and parameter bindings. The execution engine in core.ts is generic.
 - **Bearer token flow** — Token comes from `extra.authInfo` (set by the OAuth auth middleware) and is passed directly to `executeApiTool`. No env var token storage.
 - **Multi-tenant routing** — `apiBaseUrl` is resolved per-request by the tenant middleware (from `Host` subdomain or `API_BASE_URL` fallback), threaded via `req.auth.apiBaseUrl` → `extra.authInfo.apiBaseUrl` → `executeApiTool()`. No global state.
 - **Token proxy** — In single-tenant mode with `DOCEBO_CLIENT_ID`/`SECRET`, injects credentials (for public MCP clients). In multi-tenant mode, acts as pass-through forwarding client-provided credentials to the correct tenant's `/oauth2/token`.
