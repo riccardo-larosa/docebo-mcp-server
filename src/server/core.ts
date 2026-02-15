@@ -47,7 +47,7 @@ export const CHARACTER_LIMIT = 25000;
  * Combined tool entry map from all tool sources.
  * Supports both declarative McpToolDefinition and class-based BaseTool instances.
  */
-export const toolDefinitionMap: Map<string, ToolEntry> = new Map([
+export const toolDefinitionMap: Map<string, ToolEntry> = new Map<string, ToolEntry>([
   ...coursesToolsMap,
   ...enrollmentsToolsMap,
   ...usersToolsMap,
