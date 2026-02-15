@@ -35,17 +35,16 @@ import {
 // Import after mocks are set up
 const { createServer, toolDefinitionMap, securitySchemes, SERVER_NAME, SERVER_VERSION, CHARACTER_LIMIT, formatAsMarkdown, extractPaginationMetadata } = await import('../src/server/core.js');
 
+
 describe('Server Core — createServer()', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     registeredHandlers.clear();
-    process.env.API_BASE_URL = 'https://example.docebosaas.com';
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    delete process.env.API_BASE_URL;
     vi.restoreAllMocks();
   });
 
@@ -177,12 +176,11 @@ describe('Server Core — GetPrompt handler', () => {
 describe('Server Core — CallTool handler', () => {
   let callToolHandler: Function;
 
-  const authExtra = { authInfo: { token: 'test-token-123' } };
+  const authExtra = { authInfo: { token: 'test-token-123' }, apiBaseUrl: 'https://example.docebosaas.com' };
 
   beforeEach(() => {
     vi.clearAllMocks();
     registeredHandlers.clear();
-    process.env.API_BASE_URL = 'https://example.docebosaas.com';
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     createServer();
@@ -190,7 +188,6 @@ describe('Server Core — CallTool handler', () => {
   });
 
   afterEach(() => {
-    delete process.env.API_BASE_URL;
     vi.restoreAllMocks();
   });
 
@@ -717,12 +714,11 @@ describe('Server Core — course-recommendations prompt', () => {
 
 describe('Server Core — list_courses search params', () => {
   let callToolHandler: Function;
-  const authExtra = { authInfo: { token: 'test-token-123' } };
+  const authExtra = { authInfo: { token: 'test-token-123' }, apiBaseUrl: 'https://example.docebosaas.com' };
 
   beforeEach(() => {
     vi.clearAllMocks();
     registeredHandlers.clear();
-    process.env.API_BASE_URL = 'https://example.docebosaas.com';
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     createServer();
@@ -730,7 +726,6 @@ describe('Server Core — list_courses search params', () => {
   });
 
   afterEach(() => {
-    delete process.env.API_BASE_URL;
     vi.restoreAllMocks();
   });
 

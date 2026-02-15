@@ -74,7 +74,7 @@ describe('BaseTool', () => {
     it('should call process with validated input', async () => {
       const spy = vi.spyOn(echoTool, 'process');
       await echoTool.handleRequest({ message: 'test', count: 3 });
-      expect(spy).toHaveBeenCalledWith({ message: 'test', count: 3 }, undefined);
+      expect(spy).toHaveBeenCalledWith({ message: 'test', count: 3 }, undefined, undefined);
       spy.mockRestore();
     });
 

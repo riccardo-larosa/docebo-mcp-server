@@ -20,15 +20,15 @@ export abstract class BaseTool {
    * Process the validated input and return a result.
    * Override this in subclasses to implement the tool's logic.
    */
-  abstract process(input: unknown, bearerToken?: string): Promise<unknown>;
+  abstract process(input: unknown, bearerToken?: string, apiBaseUrl?: string): Promise<unknown>;
 
   /**
    * Validate args, call process(), and return a formatted CallToolResult.
    */
-  async handleRequest(args: Record<string, unknown>, bearerToken?: string): Promise<CallToolResult> {
+  async handleRequest(args: Record<string, unknown>, bearerToken?: string, apiBaseUrl?: string): Promise<CallToolResult> {
     try {
       const validated = this.zodSchema.parse(args);
-      const result = await this.process(validated, bearerToken);
+      const result = await this.process(validated, bearerToken, apiBaseUrl);
       return this.formatResponse(result);
     } catch (error: unknown) {
       if (error instanceof ZodError) {

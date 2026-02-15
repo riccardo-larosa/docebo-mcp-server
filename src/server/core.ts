@@ -38,7 +38,6 @@ type JsonObject = Record<string, any>;
  */
 export const SERVER_NAME = "docebo-mcp-server";
 export const SERVER_VERSION = "0.3.0";
-export const API_BASE_URL = process.env.API_BASE_URL;
 export const CHARACTER_LIMIT = 25000;
 
 /**
@@ -122,13 +121,15 @@ export function createServer(): Server {
 
     // Resolve the bearer token from the transport (OAuth resource server flow)
     const authToken = extra?.authInfo?.token;
+    // Resolve the API base URL (set by tenant middleware)
+    const apiBaseUrl = extra?.apiBaseUrl as string | undefined;
 
     // Class-based tools handle their own validation and execution
     if (entry instanceof BaseTool) {
-      return entry.handleRequest(toolArgs ?? {}, authToken);
+      return entry.handleRequest(toolArgs ?? {}, authToken, apiBaseUrl);
     }
 
-    return await executeApiTool(toolName, entry, toolArgs ?? {}, authToken);
+    return await executeApiTool(toolName, entry, toolArgs ?? {}, authToken, apiBaseUrl);
   });
 
   return server;
@@ -141,7 +142,8 @@ async function executeApiTool(
   toolName: string,
   definition: McpToolDefinition,
   toolArgs: JsonObject,
-  bearerToken?: string
+  bearerToken?: string,
+  apiBaseUrl?: string
 ): Promise<CallToolResult> {
   try {
     // Validate arguments against the Zod schema (or fall back to permissive validation)
@@ -161,7 +163,6 @@ async function executeApiTool(
     }
 
     // Prepare URL, query parameters, headers, and request body
-    const apiBaseUrl = API_BASE_URL;
     let urlPath = definition.pathTemplate;
     const queryParams: Record<string, any> = {};
     const headers: Record<string, string> = { 'Accept': 'application/json' };
