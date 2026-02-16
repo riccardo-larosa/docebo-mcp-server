@@ -20,6 +20,7 @@ import { notificationsToolsMap } from './tools/notifications.js';
 import { LearnerDashboardTool } from './tools/workflows/learnerDashboard.js';
 import { TeamTrainingReportTool } from './tools/workflows/teamTrainingReport.js';
 import { EnrollUserByNameTool } from './tools/workflows/enrollUserByName.js';
+import { HarmonySearchTool } from './tools/workflows/harmonySearch.js';
 import { getPrompts, getPromptMessages } from './prompts/index.js';
 import { logger } from './logger.js';
 import './prompts/courseEnrollmentReport.js';
@@ -56,6 +57,7 @@ export const toolDefinitionMap: Map<string, ToolEntry> = new Map<string, ToolEnt
   ['get_learner_dashboard', new LearnerDashboardTool()],
   ['get_team_training_report', new TeamTrainingReportTool()],
   ['enroll_user_by_name', new EnrollUserByNameTool()],
+  ['harmony_search', new HarmonySearchTool()],
 ]);
 
 /**
