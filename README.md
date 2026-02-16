@@ -23,10 +23,8 @@ Each MCP client requires an **API Credentials** app registered in your Docebo ad
 |--------|-------------|
 | Claude Desktop | `https://claude.ai/api/mcp/auth_callback` |
 | Claude Desktop (future) | `https://claude.com/api/mcp/auth_callback` |
-| Claude Code CLI | `http://localhost:{port}/oauth/callback` (use a fixed port with `--callback-port`) |
-| Cursor | `http://127.0.0.1:{port}/callback` |
 
-> **Note:** Docebo enforces strict redirect URI matching. The URI must match exactly what the MCP client sends during the OAuth flow.
+> **Note:** Docebo enforces strict redirect URI matching. The URI must match exactly what the MCP client sends during the OAuth flow. ChatGPT only supports Dynamic Client Registration (DCR) and Docebo does not at this time.
 
 ## Setup
 
@@ -140,8 +138,6 @@ High-level tools that combine multiple API calls into a single operation:
 |----------|----------|-------------|
 | `API_BASE_URL` | Yes | Your Docebo instance URL (e.g., `https://your-instance.docebosaas.com`) |
 | `MCP_SERVER_URL` | Yes | Public URL of this server (e.g. ngrok URL) |
-| `DOCEBO_CLIENT_ID` | No | OAuth client ID (enables token proxy with credential injection) |
-| `DOCEBO_CLIENT_SECRET` | No | OAuth client secret (enables token proxy with credential injection) |
 | `PORT` | No | Server port (default: 3000) |
 
 ### Multi-tenant mode (production)
@@ -150,11 +146,11 @@ High-level tools that combine multiple API calls into a single operation:
 |----------|----------|-------------|
 | `API_BASE_URL` | **Unset** | Tenant derived from `Host` subdomain instead |
 | `MCP_SERVER_URL` | Yes | Public URL (e.g. `https://mcp.yourdomain.com`) |
-| `DOCEBO_CLIENT_ID` | **Unset** | Token proxy acts as pass-through |
-| `DOCEBO_CLIENT_SECRET` | **Unset** | Token proxy acts as pass-through |
 | `PORT` | No | Server port (default: 3000) |
 
 Multi-tenant activates when `API_BASE_URL` is not set. Requests to `acme.mcp.yourdomain.com` route API calls to `https://acme.docebosaas.com`.
+
+> **Note:** OAuth credentials (client ID/secret) are provided by each MCP client during the OAuth flow. The server's token proxy forwards client-provided credentials to Docebo — no server-side credential storage needed.
 
 ## Development
 

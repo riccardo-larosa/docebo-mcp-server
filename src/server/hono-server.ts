@@ -29,10 +29,6 @@ export interface OAuthResourceConfig {
   mcpServerUrl: string;
   /** Docebo instance URL acting as the OAuth authorization server (undefined in multi-tenant mode) */
   authorizationServerUrl?: string;
-  /** OAuth client ID registered in Docebo */
-  clientId?: string;
-  /** OAuth client secret — needed to proxy the token exchange for public MCP clients */
-  clientSecret?: string;
 }
 
 /**
@@ -245,7 +241,6 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
     const resourceMetadataUrl = `${oauthConfig.mcpServerUrl.replace(/\/+$/, '')}/.well-known/oauth-protected-resource`;
 
     const mcpBase = oauthConfig.mcpServerUrl.replace(/\/+$/, '');
-    const useTokenProxy = !!(oauthConfig.clientId && oauthConfig.clientSecret);
 
     // Helper: resolve the auth server base URL for this request
     const getAuthServerBase = (c: any): string => {
@@ -269,14 +264,11 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
     // RFC 8414 — Authorization Server Metadata
     app.get('/.well-known/oauth-authorization-server', (c) => {
       const authServerBase = getAuthServerBase(c);
-      const tokenEndpoint = useTokenProxy
-        ? `${mcpBase}/oauth/token`
-        : `${authServerBase}/oauth2/token`;
 
       return c.json({
         issuer: authServerBase,
         authorization_endpoint: `${authServerBase}/oauth2/authorize`,
-        token_endpoint: tokenEndpoint,
+        token_endpoint: `${mcpBase}/oauth/token`,
         response_types_supported: ['code'],
         grant_types_supported: ['authorization_code'],
         code_challenge_methods_supported: ['S256'],
@@ -284,28 +276,22 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
       });
     });
 
-    // Token proxy — tenant-aware routing
+    // Token proxy — forwards client-provided credentials to the correct tenant's token endpoint
     app.post('/oauth/token', async (c) => {
       const start = Date.now();
       try {
         const authServerBase = getAuthServerBase(c);
         const body = await c.req.text();
-        const params = new URLSearchParams(body);
-
-        // In single-tenant mode with credentials configured, inject them
-        if (useTokenProxy) {
-          params.set('client_id', oauthConfig!.clientId!);
-          params.set('client_secret', oauthConfig!.clientSecret!);
-        }
 
         const upstream = await fetch(`${authServerBase}/oauth2/token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: params.toString(),
+          body,
         });
 
         const responseBody = await upstream.text();
 
+        const params = new URLSearchParams(body);
         logger.info({
           event: 'token_proxy',
           grant_type: params.get('grant_type'),

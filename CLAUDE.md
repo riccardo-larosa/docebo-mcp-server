@@ -70,7 +70,7 @@ Workflow tools extend `BaseTool` and use `DoceboApiClient` to collapse multi-ste
 - **Tool definitions are data, not code** — Each declarative tool is an object with JSON Schema, HTTP method, path template, and parameter bindings. The execution engine in core.ts is generic.
 - **Bearer token flow** — Token comes from `extra.authInfo` (set by the OAuth auth middleware) and is passed directly to `executeApiTool`. No env var token storage.
 - **Multi-tenant routing** — `apiBaseUrl` is resolved per-request by the tenant middleware (from `Host` subdomain or `API_BASE_URL` fallback), threaded via `req.auth.apiBaseUrl` → `extra.authInfo.apiBaseUrl` → `executeApiTool()`. No global state.
-- **Token proxy** — In single-tenant mode with `DOCEBO_CLIENT_ID`/`SECRET`, injects credentials (for public MCP clients). In multi-tenant mode, acts as pass-through forwarding client-provided credentials to the correct tenant's `/oauth2/token`.
+- **Token proxy** — Forwards client-provided OAuth credentials to the correct tenant's `/oauth2/token`. Clients must provide their own `client_id`/`client_secret` in the token exchange.
 - **Session management** — Each MCP client connection gets its own `Server` instance (via factory function) and `StreamableHTTPServerTransport`, tracked by UUID in the `mcp-session-id` HTTP header.
 
 ## Environment Variables
@@ -81,8 +81,6 @@ Workflow tools extend `BaseTool` and use `DoceboApiClient` to collapse multi-ste
 |---|---|---|
 | `API_BASE_URL` | Yes | Docebo instance URL (e.g. `https://acme.docebosaas.com`) |
 | `MCP_SERVER_URL` | Yes | Public URL of this server (e.g. ngrok URL) |
-| `DOCEBO_CLIENT_ID` | Optional | Enables token proxy with credential injection |
-| `DOCEBO_CLIENT_SECRET` | Optional | Enables token proxy with credential injection |
 | `PORT` | Optional | Server port (default 3000) |
 
 ### Multi-tenant mode (prod)
@@ -91,8 +89,6 @@ Workflow tools extend `BaseTool` and use `DoceboApiClient` to collapse multi-ste
 |---|---|---|
 | `API_BASE_URL` | **Unset** | Tenant derived from `Host` subdomain instead |
 | `MCP_SERVER_URL` | Yes | Public URL (e.g. `https://mcp.yourdomain.com`) |
-| `DOCEBO_CLIENT_ID` | **Unset** | Token proxy acts as pass-through |
-| `DOCEBO_CLIENT_SECRET` | **Unset** | Token proxy acts as pass-through |
 | `PORT` | Optional | Server port (default 3000) |
 
 Multi-tenant activates when `API_BASE_URL` is not set. Requests to `acme.mcp.yourdomain.com` route API calls to `https://acme.docebosaas.com`.

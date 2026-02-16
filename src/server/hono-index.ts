@@ -33,14 +33,11 @@ async function main() {
         // In single-tenant mode, use API_BASE_URL as auth server.
         // In multi-tenant mode, authorizationServerUrl is undefined — derived per-request from tenant.
         authorizationServerUrl: apiBaseUrl,
-        clientId: process.env.DOCEBO_CLIENT_ID,
-        clientSecret: process.env.DOCEBO_CLIENT_SECRET,
       };
       logger.info({
         event: 'oauth_config',
         mode: apiBaseUrl ? 'single-tenant' : 'multi-tenant',
         ...(apiBaseUrl && { authorization_server: apiBaseUrl }),
-        token_proxy: !!(oauthConfig.clientId && oauthConfig.clientSecret),
       });
     }
 
