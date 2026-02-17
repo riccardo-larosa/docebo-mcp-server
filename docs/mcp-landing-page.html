@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Docebo MCP Server — AI meets your learning platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Lora:ital@1&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --navy: #002b80;
+      --purple: #7e2ee9;
+      --purple-hover: #5d1ebc;
+      --blue: #2e8cff;
+      --dark: #2a2923;
+      --body-text: #56534e;
+      --medium: #807b74;
+      --light-bg: #f7f5f1;
+      --neutral-light: #ece9e1;
+      --divider: #e1dbd2;
+      --white: #ffffff;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-pill: 24px;
+      --max-width: 1120px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Figtree', sans-serif;
+      color: var(--dark);
+      background: var(--white);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Nav */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--divider);
+    }
+    .nav-inner {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--dark);
+    }
+    .nav-logo svg { flex-shrink: 0; }
+    .nav-logo span {
+      font-family: 'IBM Plex Mono', monospace;
+      font-weight: 500;
+      font-size: 13px;
+      letter-spacing: 0.03em;
+      color: var(--medium);
+      border-left: 1px solid var(--divider);
+      padding-left: 10px;
+    }
+    .nav-cta {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 10px 20px;
+      border-radius: var(--radius-pill);
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+    .nav-cta--outline {
+      border: 2px solid var(--dark);
+      color: var(--dark);
+      background: transparent;
+    }
+    .nav-cta--outline:hover {
+      background: var(--dark);
+      color: var(--white);
+    }
+
+    /* Hero */
+    .hero {
+      position: relative;
+      padding: 160px 24px 100px;
+      overflow: hidden;
+      background: var(--dark);
+      color: var(--white);
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -20%;
+      left: -10%;
+      width: 70%;
+      height: 140%;
+      background: radial-gradient(ellipse at center, rgba(126,46,233,0.25) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .hero::after {
+      content: '';
+      position: absolute;
+      bottom: -30%;
+      right: -15%;
+      width: 60%;
+      height: 120%;
+      background: radial-gradient(ellipse at center, rgba(46,140,255,0.15) 0%, transparent 55%);
+      pointer-events: none;
+    }
+    .hero-inner {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(255,255,255,0.7);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: var(--radius-pill);
+      padding: 6px 16px;
+      margin-bottom: 32px;
+      background: rgba(255,255,255,0.05);
+    }
+    .hero-badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #4ade80;
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .hero h1 {
+      font-size: clamp(40px, 2.5rem + 2vw, 64px);
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      max-width: 720px;
+      margin-bottom: 24px;
+    }
+    .hero h1 em {
+      font-family: 'Lora', serif;
+      font-style: italic;
+      color: rgba(255,255,255,0.85);
+    }
+    .hero-sub {
+      font-size: clamp(17px, 1rem + 0.3vw, 20px);
+      color: rgba(255,255,255,0.65);
+      max-width: 560px;
+      line-height: 1.7;
+      margin-bottom: 40px;
+    }
+    .hero-ctas {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 14px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 14px 28px;
+      border-radius: var(--radius-pill);
+      text-decoration: none;
+      transition: all 0.25s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      border: none;
+    }
+    .btn--primary {
+      background: var(--purple);
+      color: var(--white);
+    }
+    .btn--primary:hover {
+      background: var(--purple-hover);
+      transform: translateY(-1px);
+    }
+    .btn--ghost {
+      background: rgba(255,255,255,0.08);
+      color: var(--white);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .btn--ghost:hover {
+      background: rgba(255,255,255,0.15);
+    }
+
+    /* Section base */
+    section { padding: 100px 24px; }
+    .section-inner {
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+    .section-label {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--purple);
+      margin-bottom: 16px;
+    }
+    .section-title {
+      font-size: clamp(28px, 1.75rem + 1vw, 40px);
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -0.015em;
+      margin-bottom: 16px;
+      max-width: 600px;
+    }
+    .section-desc {
+      font-size: 17px;
+      color: var(--body-text);
+      max-width: 540px;
+      line-height: 1.7;
+      margin-bottom: 48px;
+    }
+
+    /* Use cases */
+    .use-cases { background: var(--white); }
+    .use-case-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+    }
+    .use-case-card {
+      background: var(--light-bg);
+      border-radius: var(--radius-lg);
+      padding: 32px 28px;
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .use-case-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+    }
+    .use-case-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--purple), var(--blue));
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+    .use-case-card:hover::before { opacity: 1; }
+    .use-case-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      background: var(--white);
+      color: var(--purple);
+    }
+    .use-case-card h3 {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: var(--dark);
+    }
+    .use-case-prompt {
+      font-family: 'Lora', serif;
+      font-style: italic;
+      font-size: 15px;
+      color: var(--body-text);
+      line-height: 1.6;
+    }
+
+    /* Tools */
+    .tools { background: var(--light-bg); }
+    .tools-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    @media (max-width: 700px) {
+      .tools-grid { grid-template-columns: 1fr; }
+    }
+    .tools-column h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: var(--dark);
+    }
+    .tool-item {
+      background: var(--white);
+      border-radius: var(--radius-md);
+      padding: 20px 24px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      transition: box-shadow 0.2s ease;
+    }
+    .tool-item:hover {
+      box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+    }
+    .tool-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-top: 7px;
+      flex-shrink: 0;
+    }
+    .tool-dot--workflow { background: var(--purple); }
+    .tool-dot--platform { background: var(--blue); }
+    .tool-name {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--dark);
+      margin-bottom: 4px;
+    }
+    .tool-desc {
+      font-size: 14px;
+      color: var(--medium);
+      line-height: 1.5;
+    }
+
+    /* Connect */
+    .connect { background: var(--white); }
+    .connect-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+    .connect-card {
+      border: 1px solid var(--divider);
+      border-radius: var(--radius-lg);
+      padding: 32px 28px;
+      transition: border-color 0.2s ease;
+    }
+    .connect-card:hover {
+      border-color: var(--purple);
+    }
+    .connect-card h3 {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .connect-card p {
+      font-size: 15px;
+      color: var(--body-text);
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+    .connect-card code {
+      display: block;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+      background: var(--light-bg);
+      border-radius: 8px;
+      padding: 14px 16px;
+      color: var(--dark);
+      word-break: break-all;
+      line-height: 1.6;
+    }
+
+    /* Architecture */
+    .architecture {
+      background: var(--dark);
+      color: var(--white);
+      position: relative;
+      overflow: hidden;
+    }
+    .architecture::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 80%;
+      height: 100%;
+      background: radial-gradient(ellipse at center, rgba(126,46,233,0.1) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .architecture .section-label { color: rgba(255,255,255,0.5); }
+    .architecture .section-title { color: var(--white); }
+    .architecture .section-desc { color: rgba(255,255,255,0.55); }
+    .arch-flow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      flex-wrap: wrap;
+      position: relative;
+      z-index: 1;
+    }
+    .arch-node {
+      text-align: center;
+      padding: 28px 32px;
+      border-radius: var(--radius-lg);
+      min-width: 200px;
+    }
+    .arch-node--client {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .arch-node--server {
+      background: rgba(126,46,233,0.15);
+      border: 1px solid rgba(126,46,233,0.3);
+    }
+    .arch-node--api {
+      background: rgba(46,140,255,0.12);
+      border: 1px solid rgba(46,140,255,0.25);
+    }
+    .arch-node-label {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: rgba(255,255,255,0.4);
+      margin-bottom: 8px;
+    }
+    .arch-node-name {
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .arch-node-examples {
+      font-size: 13px;
+      color: rgba(255,255,255,0.45);
+      margin-top: 6px;
+    }
+    .arch-connector {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 16px;
+      color: rgba(255,255,255,0.25);
+    }
+    .arch-connector svg { margin: 4px 0; }
+    .arch-connector-label {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    .arch-desc {
+      text-align: center;
+      max-width: 600px;
+      margin: 48px auto 0;
+      font-size: 16px;
+      color: rgba(255,255,255,0.5);
+      line-height: 1.7;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Security */
+    .security { background: var(--light-bg); }
+    .security-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 700px) {
+      .security-grid { grid-template-columns: 1fr; }
+    }
+    .security-card {
+      background: var(--white);
+      border-radius: var(--radius-lg);
+      padding: 32px 28px;
+    }
+    .security-card h3 {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .security-card p {
+      font-size: 15px;
+      color: var(--body-text);
+      line-height: 1.7;
+    }
+    .security-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--light-bg);
+      color: var(--purple);
+    }
+
+    /* Footer CTA */
+    .footer-cta {
+      background: var(--white);
+      text-align: center;
+      padding: 80px 24px;
+      border-top: 1px solid var(--divider);
+    }
+    .footer-cta h2 {
+      font-size: clamp(24px, 1.5rem + 0.8vw, 36px);
+      font-weight: 700;
+      margin-bottom: 12px;
+      letter-spacing: -0.01em;
+    }
+    .footer-cta p {
+      font-size: 16px;
+      color: var(--body-text);
+      margin-bottom: 32px;
+    }
+
+    /* Footer */
+    footer {
+      background: var(--light-bg);
+      padding: 32px 24px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--medium);
+    }
+    footer a {
+      color: var(--purple);
+      text-decoration: none;
+    }
+    footer a:hover { text-decoration: underline; }
+
+    /* Animations */
+    .fade-up {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+    .fade-up.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .hero { padding: 130px 20px 80px; }
+      section { padding: 72px 20px; }
+      .use-case-grid { grid-template-columns: 1fr; }
+      .arch-flow { flex-direction: column; }
+      .arch-connector { transform: rotate(90deg); padding: 12px 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav>
+    <div class="nav-inner">
+      <a href="#" class="nav-logo">
+        <svg width="110" height="26" viewBox="0 0 110 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <text x="0" y="20" font-family="Figtree, sans-serif" font-weight="700" font-size="22" fill="#2a2923">docebo</text>
+        </svg>
+        <span>MCP Server</span>
+      </a>
+      <a href="https://github.com/riccardo-larosa/docebo-mcp-server" class="nav-cta nav-cta--outline" target="_blank">GitHub ↗</a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="hero-badge">
+        <span class="hero-badge-dot"></span>
+        Model Context Protocol
+      </div>
+      <h1>Enable AI to interact with your <em>learning platform</em></h1>
+      <p class="hero-sub">Connect Claude, Cursor, or any MCP client to Docebo. Ask questions about learners, pull training reports, search your catalog, and manage enrollments — through natural conversation.</p>
+      <div class="hero-ctas">
+        <a href="https://github.com/riccardo-larosa/docebo-mcp-server" class="btn btn--primary">Get Started</a>
+        <a href="https://modelcontextprotocol.io/" class="btn btn--ghost" target="_blank">Learn about MCP ↗</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Use Cases -->
+  <section class="use-cases">
+    <div class="section-inner">
+      <div class="section-label">What can it do?</div>
+      <h2 class="section-title">Your AI assistant now speaks Docebo.</h2>
+      <p class="section-desc">Natural-language access to your learning platform. No API expertise required.</p>
+      <div class="use-case-grid">
+
+        <div class="use-case-card fade-up">
+          <div class="use-case-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <h3>Ask about your learners</h3>
+          <p class="use-case-prompt">"Show me Jane Smith's full training dashboard — what's she completed, what's in progress?"</p>
+        </div>
+
+        <div class="use-case-card fade-up" style="transition-delay:0.06s">
+          <div class="use-case-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <h3>Get team training reports</h3>
+          <p class="use-case-prompt">"Which team members haven't finished their required compliance courses?"</p>
+        </div>
+
+        <div class="use-case-card fade-up" style="transition-delay:0.12s">
+          <div class="use-case-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </div>
+          <h3>Search with AI</h3>
+          <p class="use-case-prompt">"Find everything we have on leadership development" — powered by Harmony Search.</p>
+        </div>
+
+        <div class="use-case-card fade-up" style="transition-delay:0.18s">
+          <div class="use-case-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+          </div>
+          <h3>Manage enrollments by name</h3>
+          <p class="use-case-prompt">"Enroll John Smith in the Compliance 101 course" — no IDs needed.</p>
+        </div>
+
+        <div class="use-case-card fade-up" style="transition-delay:0.24s">
+          <div class="use-case-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"/></svg>
+          </div>
+          <h3>Send notifications</h3>
+          <p class="use-case-prompt">"Send a training reminder to John Smith."</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Tools -->
+  <section class="tools">
+    <div class="section-inner">
+      <div class="section-label">Available tools</div>
+      <h2 class="section-title">Everything you need, built in.</h2>
+      <p class="section-desc">Workflow tools combine multiple API calls into a single step. Platform tools give you direct access.</p>
+      <div class="tools-grid">
+        <div class="tools-column">
+          <h3>Workflow tools</h3>
+          <div class="tool-item fade-up">
+            <span class="tool-dot tool-dot--workflow"></span>
+            <div>
+              <div class="tool-name">Learner Dashboard</div>
+              <div class="tool-desc">User profile + all enrollments with progress in one call</div>
+            </div>
+          </div>
+          <div class="tool-item fade-up" style="transition-delay:0.04s">
+            <span class="tool-dot tool-dot--workflow"></span>
+            <div>
+              <div class="tool-name">Team Training Report</div>
+              <div class="tool-desc">Team-wide training status with filters and completion stats</div>
+            </div>
+          </div>
+          <div class="tool-item fade-up" style="transition-delay:0.08s">
+            <span class="tool-dot tool-dot--workflow"></span>
+            <div>
+              <div class="tool-name">Enroll by Name</div>
+              <div class="tool-desc">Search user and course by name, enroll automatically</div>
+            </div>
+          </div>
+          <div class="tool-item fade-up" style="transition-delay:0.12s">
+            <span class="tool-dot tool-dot--workflow"></span>
+            <div>
+              <div class="tool-name">Harmony Search</div>
+              <div class="tool-desc">RAG-powered semantic search across your entire platform</div>
+            </div>
+          </div>
+        </div>
+        <div class="tools-column">
+          <h3>Platform tools</h3>
+          <div class="tool-item fade-up" style="transition-delay:0.04s">
+            <span class="tool-dot tool-dot--platform"></span>
+            <div>
+              <div class="tool-name">Courses</div>
+              <div class="tool-desc">List and search courses, get course details</div>
+            </div>
+          </div>
+          <div class="tool-item fade-up" style="transition-delay:0.08s">
+            <span class="tool-dot tool-dot--platform"></span>
+            <div>
+              <div class="tool-name">Enrollments</div>
+              <div class="tool-desc">List, create, and remove enrollments; get progress and details</div>
+            </div>
+          </div>
+          <div class="tool-item fade-up" style="transition-delay:0.12s">
+            <span class="tool-dot tool-dot--platform"></span>
+            <div>
+              <div class="tool-name">Users</div>
+              <div class="tool-desc">List and search users, get user profiles</div>
+            </div>
+          </div>
+          <div class="tool-item fade-up" style="transition-delay:0.16s">
+            <span class="tool-dot tool-dot--platform"></span>
+            <div>
+              <div class="tool-name">Notifications</div>
+              <div class="tool-desc">Send training reminders and learning plan notifications</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Connect -->
+  <section class="connect">
+    <div class="section-inner">
+      <div class="section-label">Connect in seconds</div>
+      <h2 class="section-title">Works with any MCP client.</h2>
+      <p class="section-desc">OAuth 2.0 authentication built in. No SDK, no custom code.</p>
+      <div class="connect-cards">
+
+        <div class="connect-card fade-up">
+          <h3>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            Claude Desktop
+          </h3>
+          <p>Add a remote MCP server in settings. Claude handles OAuth authorization automatically.</p>
+          <code>https://your-instance.mcp.yourdomain.com/mcp</code>
+        </div>
+
+        <div class="connect-card fade-up" style="transition-delay:0.06s">
+          <h3>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            Claude Code
+          </h3>
+          <p>One command to connect. Authenticates via your browser.</p>
+          <code>claude mcp add docebo --transport http https://your-instance.mcp.yourdomain.com/mcp</code>
+        </div>
+
+        <div class="connect-card fade-up" style="transition-delay:0.12s">
+          <h3>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            Other MCP clients
+          </h3>
+          <p>Cursor, Windsurf, and any client that supports remote MCP servers with OAuth 2.0.</p>
+          <code>https://your-instance.mcp.yourdomain.com/mcp</code>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture -->
+  <section class="architecture">
+    <div class="section-inner">
+      <div class="section-label">How it works</div>
+      <h2 class="section-title" style="color:var(--white)">Three layers. Zero complexity.</h2>
+      <p class="section-desc" style="margin-bottom:56px">The MCP server translates natural-language tool calls into Docebo API requests — handling authentication, validation, pagination, and error formatting.</p>
+      <div class="arch-flow fade-up">
+        <div class="arch-node arch-node--client">
+          <div class="arch-node-label">Your AI client</div>
+          <div class="arch-node-name">MCP Client</div>
+          <div class="arch-node-examples">Claude, Cursor, Windsurf</div>
+        </div>
+        <div class="arch-connector">
+          <svg width="40" height="16" viewBox="0 0 40 16"><path d="M0 8h36M30 2l6 6-6 6" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+          <span class="arch-connector-label">HTTP + OAuth 2.0</span>
+          <svg width="40" height="16" viewBox="0 0 40 16"><path d="M40 8H4M10 2L4 8l6 6" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+        </div>
+        <div class="arch-node arch-node--server">
+          <div class="arch-node-label">Remote server</div>
+          <div class="arch-node-name">Docebo MCP</div>
+          <div class="arch-node-examples">Hosted by you</div>
+        </div>
+        <div class="arch-connector">
+          <svg width="40" height="16" viewBox="0 0 40 16"><path d="M0 8h36M30 2l6 6-6 6" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+          <span class="arch-connector-label">REST API</span>
+          <svg width="40" height="16" viewBox="0 0 40 16"><path d="M40 8H4M10 2L4 8l6 6" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+        </div>
+        <div class="arch-node arch-node--api">
+          <div class="arch-node-label">Your instance</div>
+          <div class="arch-node-name">Docebo LMS</div>
+          <div class="arch-node-examples">acme.docebosaas.com</div>
+        </div>
+      </div>
+      <p class="arch-desc">Your existing Docebo permissions apply. The AI can only access what the authenticated user can access.</p>
+    </div>
+  </section>
+
+  <!-- Security -->
+  <section class="security">
+    <div class="section-inner">
+      <div class="section-label">Secure by design</div>
+      <h2 class="section-title">Enterprise-grade security, built in.</h2>
+      <p class="section-desc">No API keys stored. No elevated permissions. Just OAuth 2.0 and your existing access controls.</p>
+      <div class="security-grid">
+        <div class="security-card fade-up">
+          <h3>
+            <span class="security-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </span>
+            OAuth 2.0
+          </h3>
+          <p>Industry-standard authentication. Users authorize with their own Docebo credentials. No API keys stored on the server.</p>
+        </div>
+        <div class="security-card fade-up" style="transition-delay:0.06s">
+          <h3>
+            <span class="security-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </span>
+            Per-user permissions
+          </h3>
+          <p>The AI can only access what the authenticated user can access in Docebo. Your existing role-based access controls apply.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer CTA -->
+  <section class="footer-cta">
+    <h2>Ready to connect AI to your learning platform?</h2>
+    <p>Deploy in minutes. Your AI assistant now speaks Docebo.</p>
+    <a href="https://github.com/riccardo-larosa/docebo-mcp-server" class="btn btn--primary">Get Started on GitHub</a>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    Built on the <a href="https://modelcontextprotocol.io/" target="_blank">Model Context Protocol</a> open standard.
+  </footer>
+
+  <script>
+    // Intersection Observer for fade-up animations
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+  </script>
+</body>
+</html>
