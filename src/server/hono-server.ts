@@ -86,7 +86,7 @@ class MCPStreamableHttpServer {
       const bearerToken: string | undefined = c.get('bearerToken');
       const apiBaseUrl: string | undefined = c.get('apiBaseUrl');
       if (bearerToken) {
-        (req as any).auth = { token: bearerToken, clientId: 'oauth', scopes: ['api'], apiBaseUrl };
+        (req as any).auth = { token: bearerToken, clientId: 'oauth', scopes: [], apiBaseUrl };
       } else {
         // Even without a bearer token, thread apiBaseUrl through auth so the
         // SDK passes it as extra.authInfo to tool handlers.
@@ -256,7 +256,7 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
       return c.json({
         resource: oauthConfig.mcpServerUrl,
         authorization_servers: [mcpBase],
-        scopes_supported: ['api'],
+        scopes_supported: [],
         bearer_methods_supported: ['header'],
       });
     });
@@ -272,7 +272,7 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
         response_types_supported: ['code'],
         grant_types_supported: ['authorization_code'],
         code_challenge_methods_supported: ['S256'],
-        scopes_supported: ['api'],
+        scopes_supported: [],
       });
     });
 

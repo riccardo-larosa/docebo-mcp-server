@@ -37,7 +37,7 @@ describe('OAuth Resource Server', () => {
       return c.json({
         resource: oauthConfig.mcpServerUrl,
         authorization_servers: [oauthConfig.authorizationServerUrl],
-        scopes_supported: ['api'],
+        scopes_supported: [],
         bearer_methods_supported: ['header'],
       });
     });
@@ -83,7 +83,7 @@ describe('OAuth Resource Server', () => {
       const body = await res.json();
       expect(body.resource).toBe(MCP_SERVER_URL);
       expect(body.authorization_servers).toEqual([AUTH_SERVER_URL]);
-      expect(body.scopes_supported).toEqual(['api']);
+      expect(body.scopes_supported).toEqual([]);
       expect(body.bearer_methods_supported).toEqual(['header']);
     });
 
