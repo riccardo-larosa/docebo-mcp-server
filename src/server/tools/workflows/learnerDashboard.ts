@@ -15,7 +15,7 @@ Returns: User profile (name, email, role, department) and enriched enrollment li
 Usage Guidance:
   - Provide the user_id for the learner.
   - Replaces the need to call get_user + get_user_progress + get_enrollment_details separately.
-  - Use list_users first if you only have a name or email.`;
+  - Use get_my_profile first to get the current user's ID, or list_users (admin only) if looking up another user.`;
   zodSchema = schema;
   annotations = {
     title: 'Learner Dashboard',

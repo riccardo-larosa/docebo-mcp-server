@@ -16,13 +16,14 @@ const getUserSchema = z.object({
 export const usersToolsMap: Map<string, McpToolDefinition> = new Map([
   ["list_users", {
     name: "list_users",
-    description: `Purpose: Searches and lists platform users from the Docebo learning platform.
+    description: `Purpose: Searches and lists platform users from the Docebo learning platform. ADMIN ONLY — requires admin or superadmin role.
 
 Returns: Collection of users with profile data (name, email, role, department) and pagination info.
 
 Usage Guidance:
-  - Use to find users by name or email.
-  - Use to list team members or browse the user directory.
+  - IMPORTANT: This endpoint requires admin permissions. For the current user's own profile, use get_my_profile instead.
+  - Use to find users by name or email (admin only).
+  - Use to list team members or browse the user directory (admin only).
   - Returns user IDs needed for enrollment queries with list_enrollments.
   - Supports pagination via page and page_size parameters.`,
     inputSchema: z.toJSONSchema(listUsersSchema),
@@ -46,11 +47,12 @@ Usage Guidance:
   }],
   ["get_user", {
     name: "get_user",
-    description: `Purpose: Retrieves detailed user profile information by user ID.
+    description: `Purpose: Retrieves detailed user profile information by user ID. ADMIN ONLY — requires admin or superadmin role.
 
 Returns: Full user profile including name, email, role, department, branch, and status.
 
 Usage Guidance:
+  - IMPORTANT: This endpoint requires admin permissions. For the current user's own profile, use get_my_profile instead.
   - Use when you have a user_id from list_users.
   - Use list_users first to find a user by name or email.`,
     inputSchema: z.toJSONSchema(getUserSchema),
