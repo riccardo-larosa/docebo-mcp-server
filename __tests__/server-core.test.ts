@@ -633,6 +633,19 @@ describe('Server Core — New tools in ListTools', () => {
     expect(toolNames).toContain('list_users');
     expect(toolNames).toContain('get_user');
   });
+
+  it('should include search tools in ListTools response', async () => {
+    const result = await listToolsHandler();
+    const toolNames = result.tools.map((t: any) => t.name);
+    expect(toolNames).toContain('global_search');
+  });
+
+  it('should return correct annotations for global_search', async () => {
+    const result = await listToolsHandler();
+    const globalSearch = result.tools.find((t: any) => t.name === 'global_search');
+    expect(globalSearch.annotations.readOnlyHint).toBe(true);
+    expect(globalSearch.annotations.idempotentHint).toBe(true);
+  });
 });
 
 describe('Server Core — Workflow tools via CallTool', () => {
@@ -1004,5 +1017,51 @@ describe('Server Core — prompts use snake_case tool names', () => {
     expect(text).toContain('get_enrollment_details');
     expect(text).not.toContain('get-user-progress');
     expect(text).not.toContain('get-enrollment-details');
+  });
+});
+
+describe('Server Core — global_search tool', () => {
+  let callToolHandler: Function;
+  const authExtra = { authInfo: { token: 'test-token-123' }, apiBaseUrl: 'https://example.docebosaas.com' };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    registeredHandlers.clear();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    createServer();
+    callToolHandler = registeredHandlers.get(CallToolRequestSchema)!;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should execute global_search and pass criteria as query param', async () => {
+    mockAxios.mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      data: { data: { results: [{ title: 'Compliance Training' }] } },
+    });
+
+    const result = await callToolHandler({
+      params: { name: 'global_search', arguments: { criteria: 'compliance' } },
+    }, authExtra);
+
+    expect(result.isError).toBeUndefined();
+    expect(result.content[0].text).toContain('Compliance Training');
+
+    const axiosCall = mockAxios.mock.calls[0][0];
+    expect(axiosCall.url).toContain('manage/v1/globalsearch/search');
+    expect(axiosCall.params.criteria).toBe('compliance');
+  });
+
+  it('should reject missing criteria', async () => {
+    const result = await callToolHandler({
+      params: { name: 'global_search', arguments: {} },
+    }, authExtra);
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Invalid arguments');
   });
 });

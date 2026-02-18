@@ -17,6 +17,7 @@ import { coursesToolsMap } from './tools/courses.js';
 import { enrollmentsToolsMap } from './tools/enrollments.js';
 import { usersToolsMap } from './tools/users.js';
 import { notificationsToolsMap } from './tools/notifications.js';
+import { searchToolsMap } from './tools/search.js';
 import { LearnerDashboardTool } from './tools/workflows/learnerDashboard.js';
 import { TeamTrainingReportTool } from './tools/workflows/teamTrainingReport.js';
 import { EnrollUserByNameTool } from './tools/workflows/enrollUserByName.js';
@@ -55,6 +56,7 @@ export const toolDefinitionMap: Map<string, ToolEntry> = new Map<string, ToolEnt
   ...enrollmentsToolsMap,
   ...usersToolsMap,
   ...notificationsToolsMap,
+  ...searchToolsMap,
   ['get_learner_dashboard', new LearnerDashboardTool()],
   ['get_team_training_report', new TeamTrainingReportTool()],
   ['enroll_user_by_name', new EnrollUserByNameTool()],
