@@ -373,8 +373,7 @@ describe('Server Core — CallTool handler', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('404');
-    expect(result.content[0].text).toContain('Not Found');
+    expect(result.content[0].text).toContain('Resource not found');
   });
 
   it('should handle axios errors with string response body', async () => {
@@ -392,6 +391,7 @@ describe('Server Core — CallTool handler', () => {
     });
 
     expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Docebo service error');
     expect(result.content[0].text).toContain('Server exploded');
   });
 
@@ -410,7 +410,7 @@ describe('Server Core — CallTool handler', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('No response body received');
+    expect(result.content[0].text).toContain('Docebo service error');
   });
 
   it('should handle axios network errors (no response)', async () => {
@@ -1063,5 +1063,92 @@ describe('Server Core — global_search tool', () => {
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Invalid arguments');
+  });
+});
+
+describe('Server Core — actionable error hints', () => {
+  let callToolHandler: Function;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    registeredHandlers.clear();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    createServer();
+    callToolHandler = registeredHandlers.get(CallToolRequestSchema)!;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should include auth hint for 401 errors', async () => {
+    const axiosError = new Error('Request failed') as any;
+    axiosError.isAxiosError = true;
+    axiosError.response = { status: 401, statusText: 'Unauthorized', data: null };
+    mockAxios.mockRejectedValue(axiosError);
+
+    const result = await callToolHandler({
+      params: { name: 'list_courses', arguments: {} },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Authentication expired');
+  });
+
+  it('should include permissions hint for 403 errors', async () => {
+    const axiosError = new Error('Request failed') as any;
+    axiosError.isAxiosError = true;
+    axiosError.response = { status: 403, statusText: 'Forbidden', data: null };
+    mockAxios.mockRejectedValue(axiosError);
+
+    const result = await callToolHandler({
+      params: { name: 'list_courses', arguments: {} },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Insufficient permissions');
+  });
+
+  it('should include not-found hint for 404 errors', async () => {
+    const axiosError = new Error('Request failed') as any;
+    axiosError.isAxiosError = true;
+    axiosError.response = { status: 404, statusText: 'Not Found', data: null };
+    mockAxios.mockRejectedValue(axiosError);
+
+    const result = await callToolHandler({
+      params: { name: 'list_courses', arguments: {} },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Resource not found');
+  });
+
+  it('should include rate-limit hint for 429 errors', async () => {
+    const axiosError = new Error('Request failed') as any;
+    axiosError.isAxiosError = true;
+    axiosError.response = { status: 429, statusText: 'Too Many Requests', data: null };
+    mockAxios.mockRejectedValue(axiosError);
+
+    const result = await callToolHandler({
+      params: { name: 'list_courses', arguments: {} },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Rate limited');
+  });
+
+  it('should include service-error hint for 5xx errors', async () => {
+    const axiosError = new Error('Request failed') as any;
+    axiosError.isAxiosError = true;
+    axiosError.response = { status: 503, statusText: 'Service Unavailable', data: null };
+    mockAxios.mockRejectedValue(axiosError);
+
+    const result = await callToolHandler({
+      params: { name: 'list_courses', arguments: {} },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Docebo service error');
   });
 });

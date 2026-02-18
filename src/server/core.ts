@@ -416,7 +416,21 @@ export function extractPaginationMetadata(data: any): string | null {
 function formatApiError(error: AxiosError): string {
   let message = 'API request failed.';
   if (error.response) {
-    message = `API Error: Status ${error.response.status} (${error.response.statusText || 'Status text not available'}). `;
+    const status = error.response.status;
+
+    // Actionable hint based on status code
+    const hints: Record<number, string> = {
+      401: 'Authentication expired — the user may need to re-authenticate.',
+      403: 'Insufficient permissions for this operation.',
+      404: 'Resource not found — verify the ID or path is correct.',
+      429: 'Rate limited — wait before retrying.',
+    };
+    const hint = hints[status] ?? (status >= 500 ? 'Docebo service error — try again later.' : undefined);
+
+    message = hint
+      ? `${hint} `
+      : `API Error: Status ${status} (${error.response.statusText || 'Status text not available'}). `;
+
     const responseData = error.response.data;
     const MAX_LEN = 200;
     if (typeof responseData === 'string') {
@@ -429,9 +443,6 @@ function formatApiError(error: AxiosError): string {
       } catch {
         message += 'Response: [Could not serialize data]';
       }
-    }
-    else {
-      message += 'No response body received.';
     }
   } else if (error.request) {
     message = 'API Network Error: No response received from server.';
