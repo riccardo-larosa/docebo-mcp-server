@@ -1152,3 +1152,63 @@ describe('Server Core — actionable error hints', () => {
     expect(result.content[0].text).toContain('Docebo service error');
   });
 });
+
+describe('Server Core — whitespace validation', () => {
+  let callToolHandler: Function;
+  const authExtra = { authInfo: { token: 'test-token-123' }, apiBaseUrl: 'https://example.docebosaas.com' };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    registeredHandlers.clear();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    createServer();
+    callToolHandler = registeredHandlers.get(CallToolRequestSchema)!;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should reject whitespace-only criteria for global_search', async () => {
+    const result = await callToolHandler({
+      params: { name: 'global_search', arguments: { criteria: '   ' } },
+    }, authExtra);
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Invalid arguments');
+  });
+
+  it('should trim search_text for list_courses', async () => {
+    mockAxios.mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      data: { data: { items: [] } },
+    });
+
+    await callToolHandler({
+      params: { name: 'list_courses', arguments: { search_text: '  compliance  ' } },
+    }, authExtra);
+
+    const axiosCall = mockAxios.mock.calls[0][0];
+    expect(axiosCall.params.search_text).toBe('compliance');
+  });
+
+  it('should reject whitespace-only query for harmony_search', async () => {
+    const result = await callToolHandler({
+      params: { name: 'harmony_search', arguments: { query: '   ' } },
+    }, authExtra);
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Invalid arguments');
+  });
+
+  it('should reject whitespace-only user_search for enroll_user_by_name', async () => {
+    const result = await callToolHandler({
+      params: { name: 'enroll_user_by_name', arguments: { user_search: '  ', course_search: 'Compliance' } },
+    }, authExtra);
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Invalid arguments');
+  });
+});

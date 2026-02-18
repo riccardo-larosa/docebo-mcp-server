@@ -3,8 +3,8 @@ import { BaseTool } from '../baseTool.js';
 import { DoceboApiClient } from '../doceboApi.js';
 
 const schema = z.object({
-  user_search: z.string().describe('Name or email to find the user'),
-  course_search: z.string().describe('Course name to find the course'),
+  user_search: z.string().trim().min(1).describe('Name or email to find the user'),
+  course_search: z.string().trim().min(1).describe('Course name to find the course'),
   level: z.number().optional().describe('Enrollment level (default: learner)'),
 });
 

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { McpToolDefinition } from "./index.js";
 
 const listUsersSchema = z.object({
-  search_text: z.string().optional().describe("Search users by name or email"),
+  search_text: z.string().trim().optional().describe("Search users by name or email"),
   page: z.number().int().min(0).default(0).describe("Zero-based page offset (default: 0)"),
   page_size: z.number().int().min(1).max(200).default(20).describe("Max records per page (default: 20, max: 200)"),
   response_format: z.enum(['json', 'markdown']).default('json').describe("Response format: 'json' (default) returns raw API data, 'markdown' returns a concise formatted summary."),

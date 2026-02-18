@@ -4,7 +4,7 @@ import { McpToolDefinition } from "./index.js";
 const listCoursesSchema = z.object({
   page: z.number().int().min(0).default(0).describe("Zero-based page offset (default: 0)"),
   page_size: z.number().int().min(1).max(200).default(20).describe("Max records per page (default: 20, max: 200)"),
-  search_text: z.string().optional().describe("Search courses by name or description."),
+  search_text: z.string().trim().optional().describe("Search courses by name or description."),
   category: z.string().optional().describe("Filter courses by category name."),
   status: z.string().optional().describe("Filter courses by status (e.g., published, under_maintenance)."),
   sort_by: z.string().optional().describe("Sort results by field (e.g., name, date_created)."),
