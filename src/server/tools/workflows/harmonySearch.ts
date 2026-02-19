@@ -4,7 +4,7 @@ import { BaseTool } from '../baseTool.js';
 import { DoceboApiClient } from '../doceboApi.js';
 
 const schema = z.object({
-  query: z.string().describe('The search query to send to Harmony Search'),
+  query: z.string().trim().min(1).describe('The search query to send to Harmony Search'),
 });
 
 interface BootstrapResponse {

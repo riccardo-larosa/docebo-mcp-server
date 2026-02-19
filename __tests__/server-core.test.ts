@@ -373,8 +373,7 @@ describe('Server Core — CallTool handler', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('404');
-    expect(result.content[0].text).toContain('Not Found');
+    expect(result.content[0].text).toContain('Resource not found');
   });
 
   it('should handle axios errors with string response body', async () => {
@@ -392,6 +391,7 @@ describe('Server Core — CallTool handler', () => {
     });
 
     expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Docebo service error (500)');
     expect(result.content[0].text).toContain('Server exploded');
   });
 
@@ -410,7 +410,7 @@ describe('Server Core — CallTool handler', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('No response body received');
+    expect(result.content[0].text).toContain('Docebo service error (502)');
   });
 
   it('should handle axios network errors (no response)', async () => {
@@ -632,6 +632,19 @@ describe('Server Core — New tools in ListTools', () => {
     const toolNames = result.tools.map((t: any) => t.name);
     expect(toolNames).toContain('list_users');
     expect(toolNames).toContain('get_user');
+  });
+
+  it('should include search tools in ListTools response', async () => {
+    const result = await listToolsHandler();
+    const toolNames = result.tools.map((t: any) => t.name);
+    expect(toolNames).toContain('global_search');
+  });
+
+  it('should return correct annotations for global_search', async () => {
+    const result = await listToolsHandler();
+    const globalSearch = result.tools.find((t: any) => t.name === 'global_search');
+    expect(globalSearch.annotations.readOnlyHint).toBe(true);
+    expect(globalSearch.annotations.idempotentHint).toBe(true);
   });
 });
 
@@ -1004,5 +1017,198 @@ describe('Server Core — prompts use snake_case tool names', () => {
     expect(text).toContain('get_enrollment_details');
     expect(text).not.toContain('get-user-progress');
     expect(text).not.toContain('get-enrollment-details');
+  });
+});
+
+describe('Server Core — global_search tool', () => {
+  let callToolHandler: Function;
+  const authExtra = { authInfo: { token: 'test-token-123' }, apiBaseUrl: 'https://example.docebosaas.com' };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    registeredHandlers.clear();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    createServer();
+    callToolHandler = registeredHandlers.get(CallToolRequestSchema)!;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should execute global_search and pass criteria as query param', async () => {
+    mockAxios.mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      data: { data: { results: [{ title: 'Compliance Training' }] } },
+    });
+
+    const result = await callToolHandler({
+      params: { name: 'global_search', arguments: { criteria: 'compliance' } },
+    }, authExtra);
+
+    expect(result.isError).toBeUndefined();
+    expect(result.content[0].text).toContain('Compliance Training');
+
+    const axiosCall = mockAxios.mock.calls[0][0];
+    expect(axiosCall.url).toContain('manage/v1/globalsearch/search');
+    expect(axiosCall.params.criteria).toBe('compliance');
+  });
+
+  it('should reject missing criteria', async () => {
+    const result = await callToolHandler({
+      params: { name: 'global_search', arguments: {} },
+    }, authExtra);
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Invalid arguments');
+  });
+});
+
+describe('Server Core — actionable error hints', () => {
+  let callToolHandler: Function;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    registeredHandlers.clear();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    createServer();
+    callToolHandler = registeredHandlers.get(CallToolRequestSchema)!;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should include auth hint for 401 errors', async () => {
+    const axiosError = new Error('Request failed') as any;
+    axiosError.isAxiosError = true;
+    axiosError.response = { status: 401, statusText: 'Unauthorized', data: null };
+    mockAxios.mockRejectedValue(axiosError);
+
+    const result = await callToolHandler({
+      params: { name: 'list_courses', arguments: {} },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Authentication expired');
+  });
+
+  it('should include permissions hint for 403 errors', async () => {
+    const axiosError = new Error('Request failed') as any;
+    axiosError.isAxiosError = true;
+    axiosError.response = { status: 403, statusText: 'Forbidden', data: null };
+    mockAxios.mockRejectedValue(axiosError);
+
+    const result = await callToolHandler({
+      params: { name: 'list_courses', arguments: {} },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Insufficient permissions');
+  });
+
+  it('should include not-found hint for 404 errors', async () => {
+    const axiosError = new Error('Request failed') as any;
+    axiosError.isAxiosError = true;
+    axiosError.response = { status: 404, statusText: 'Not Found', data: null };
+    mockAxios.mockRejectedValue(axiosError);
+
+    const result = await callToolHandler({
+      params: { name: 'list_courses', arguments: {} },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Resource not found');
+  });
+
+  it('should include rate-limit hint for 429 errors', async () => {
+    const axiosError = new Error('Request failed') as any;
+    axiosError.isAxiosError = true;
+    axiosError.response = { status: 429, statusText: 'Too Many Requests', data: null };
+    mockAxios.mockRejectedValue(axiosError);
+
+    const result = await callToolHandler({
+      params: { name: 'list_courses', arguments: {} },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Rate limited');
+  });
+
+  it('should include service-error hint for 5xx errors', async () => {
+    const axiosError = new Error('Request failed') as any;
+    axiosError.isAxiosError = true;
+    axiosError.response = { status: 503, statusText: 'Service Unavailable', data: null };
+    mockAxios.mockRejectedValue(axiosError);
+
+    const result = await callToolHandler({
+      params: { name: 'list_courses', arguments: {} },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Docebo service error (503)');
+  });
+});
+
+describe('Server Core — whitespace validation', () => {
+  let callToolHandler: Function;
+  const authExtra = { authInfo: { token: 'test-token-123' }, apiBaseUrl: 'https://example.docebosaas.com' };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    registeredHandlers.clear();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    createServer();
+    callToolHandler = registeredHandlers.get(CallToolRequestSchema)!;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should reject whitespace-only criteria for global_search', async () => {
+    const result = await callToolHandler({
+      params: { name: 'global_search', arguments: { criteria: '   ' } },
+    }, authExtra);
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Invalid arguments');
+  });
+
+  it('should trim search_text for list_courses', async () => {
+    mockAxios.mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      data: { data: { items: [] } },
+    });
+
+    await callToolHandler({
+      params: { name: 'list_courses', arguments: { search_text: '  compliance  ' } },
+    }, authExtra);
+
+    const axiosCall = mockAxios.mock.calls[0][0];
+    expect(axiosCall.params.search_text).toBe('compliance');
+  });
+
+  it('should reject whitespace-only query for harmony_search', async () => {
+    const result = await callToolHandler({
+      params: { name: 'harmony_search', arguments: { query: '   ' } },
+    }, authExtra);
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Invalid arguments');
+  });
+
+  it('should reject whitespace-only user_search for enroll_user_by_name', async () => {
+    const result = await callToolHandler({
+      params: { name: 'enroll_user_by_name', arguments: { user_search: '  ', course_search: 'Compliance' } },
+    }, authExtra);
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Invalid arguments');
   });
 });

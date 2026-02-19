@@ -4,7 +4,7 @@ import { McpToolDefinition } from "./index.js";
 const listEnrollmentsSchema = z.object({
   id_user: z.string().optional().describe("Filter enrollments by user ID"),
   id_course: z.string().optional().describe("Filter enrollments by course ID"),
-  status: z.string().optional().describe("Filter by enrollment status (e.g., subscribed, in_progress, completed)"),
+  status: z.string().trim().optional().describe("Filter by enrollment status (e.g., subscribed, in_progress, completed)"),
   page: z.number().int().min(0).default(0).describe("Zero-based page offset (default: 0)"),
   page_size: z.number().int().min(1).max(200).default(20).describe("Max records per page (default: 20, max: 200)"),
   response_format: z.enum(['json', 'markdown']).default('json').describe("Response format: 'json' (default) returns raw API data, 'markdown' returns a concise formatted summary."),
