@@ -391,7 +391,7 @@ describe('Server Core — CallTool handler', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Docebo service error');
+    expect(result.content[0].text).toContain('Docebo service error (500)');
     expect(result.content[0].text).toContain('Server exploded');
   });
 
@@ -410,7 +410,7 @@ describe('Server Core — CallTool handler', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Docebo service error');
+    expect(result.content[0].text).toContain('Docebo service error (502)');
   });
 
   it('should handle axios network errors (no response)', async () => {
@@ -1149,7 +1149,7 @@ describe('Server Core — actionable error hints', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Docebo service error');
+    expect(result.content[0].text).toContain('Docebo service error (503)');
   });
 });
 

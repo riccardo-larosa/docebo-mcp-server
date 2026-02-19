@@ -425,7 +425,7 @@ function formatApiError(error: AxiosError): string {
       404: 'Resource not found — verify the ID or path is correct.',
       429: 'Rate limited — wait before retrying.',
     };
-    const hint = hints[status] ?? (status >= 500 ? 'Docebo service error — try again later.' : undefined);
+    const hint = hints[status] ?? (status >= 500 ? `Docebo service error (${status}) — try again later.` : undefined);
 
     message = hint
       ? `${hint} `
