@@ -60,10 +60,10 @@ claude mcp add docebo --transport http https://your-server-url.example.com/mcp
 
 Once set up, try these example prompts:
 
-### Learner Dashboard
+### My Dashboard
 
-- Show me the full dashboard for user 12345.
-- What courses has Jane Smith completed and what's still in progress?
+- Show me my learner dashboard.
+- What courses have I completed and what's still in progress?
 
 ### Team Training Reports
 
@@ -78,14 +78,14 @@ Once set up, try these example prompts:
 
 ### Search and Browse
 
+- Search for anything related to "data privacy".
 - Find all courses related to "leadership".
-- Show me the details for course 456.
-- List all enrollments for course 456.
+- What training do we have about compliance?
 
 ### Send Notifications
 
-- Send a training reminder email to user 12345.
-- Trigger a learning plan notification for user 67890.
+- Send a training reminder email to Jane Smith.
+- Notify John Doe about his learning plan.
 
 ## Tools
 
@@ -95,9 +95,12 @@ High-level tools that combine multiple API calls into a single operation:
 
 | Tool | Description |
 |------|-------------|
+| `get_my_profile` | Returns the current user's profile (no admin permissions needed) |
 | `get_learner_dashboard` | Returns user profile + all course enrollments with progress in one call |
 | `get_team_training_report` | Generates a team-wide training report with filters (search, course, status) |
 | `enroll_user_by_name` | Enrolls a user in a course by name — no IDs needed. Returns candidates if ambiguous |
+| `harmony_search` | AI-powered semantic search across Docebo content (RAG-powered) |
+| `global_search` | Fast keyword search across all Docebo content types |
 
 ### Courses
 
