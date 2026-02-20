@@ -407,11 +407,12 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
     fetch: app.fetch,
     port
   }, (info) => {
+    const base = oauthConfig?.mcpServerUrl?.replace(/\/+$/, '') || `http://localhost:${info.port}`;
     logger.info({
       event: 'server_started',
       port: info.port,
-      mcp_endpoint: `http://localhost:${info.port}/mcp`,
-      health_endpoint: `http://localhost:${info.port}/health`,
+      mcp_endpoint: `${base}/mcp`,
+      health_endpoint: `${base}/health`,
     });
   });
 
