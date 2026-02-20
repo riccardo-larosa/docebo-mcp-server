@@ -41,7 +41,7 @@ async function main() {
       ...(apiBaseUrl && { authorization_server: apiBaseUrl }),
     });
 
-    const port = parseInt(process.env.PORT as string, 10);
+    const port = parseInt(process.env.PORT || '3000', 10);
     await setupStreamableHttpServer(() => createServer(), port, oauthConfig);
   } catch (error) {
     logger.error({ event: 'server_startup_error', error: error instanceof Error ? error.message : String(error) });
