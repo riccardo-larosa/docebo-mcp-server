@@ -1,0 +1,19 @@
+node_modules/
+.git/
+build/
+.logs/
+coverage/
+.env*
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docs & tests
+docs/
+__tests__/
+*.md
+!package.json
