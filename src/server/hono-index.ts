@@ -22,26 +22,26 @@ async function cleanup() {
  */
 async function main() {
   try {
-    // Build OAuth resource server config
-    let oauthConfig: OAuthResourceConfig | undefined;
+    // Build OAuth resource server config — always enabled.
+    // mcpServerUrl is optional: if MCP_SERVER_URL is set it's used as a static override,
+    // otherwise the server derives its public URL per-request from the Host header.
     const mcpServerUrl = process.env.MCP_SERVER_URL;
     const apiBaseUrl = process.env.API_BASE_URL;
 
-    if (mcpServerUrl) {
-      oauthConfig = {
-        mcpServerUrl,
-        // In single-tenant mode, use API_BASE_URL as auth server.
-        // In multi-tenant mode, authorizationServerUrl is undefined — derived per-request from tenant.
-        authorizationServerUrl: apiBaseUrl,
-      };
-      logger.info({
-        event: 'oauth_config',
-        mode: apiBaseUrl ? 'single-tenant' : 'multi-tenant',
-        ...(apiBaseUrl && { authorization_server: apiBaseUrl }),
-      });
-    }
+    const oauthConfig: OAuthResourceConfig = {
+      mcpServerUrl,
+      // In single-tenant mode, use API_BASE_URL as auth server.
+      // In multi-tenant mode, authorizationServerUrl is undefined — derived per-request from tenant.
+      authorizationServerUrl: apiBaseUrl,
+    };
+    logger.info({
+      event: 'oauth_config',
+      mode: apiBaseUrl ? 'single-tenant' : 'multi-tenant',
+      mcp_server_url: mcpServerUrl || '(derived from Host header)',
+      ...(apiBaseUrl && { authorization_server: apiBaseUrl }),
+    });
 
-    const port = parseInt(process.env.PORT || '3000', 10);
+    const port = parseInt(process.env.PORT as string, 10);
     await setupStreamableHttpServer(() => createServer(), port, oauthConfig);
   } catch (error) {
     logger.error({ event: 'server_startup_error', error: error instanceof Error ? error.message : String(error) });

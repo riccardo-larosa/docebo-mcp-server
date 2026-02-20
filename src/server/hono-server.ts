@@ -25,8 +25,8 @@ const JSON_RPC = "2.0";
  * and requires Bearer tokens on /mcp requests.
  */
 export interface OAuthResourceConfig {
-  /** Public URL of this MCP server (e.g. "https://mcp.example.com") */
-  mcpServerUrl: string;
+  /** Static override for the MCP server URL. If unset, derived per-request from Host header. */
+  mcpServerUrl?: string;
   /** Docebo instance URL acting as the OAuth authorization server (undefined in multi-tenant mode) */
   authorizationServerUrl?: string;
 }
@@ -238,9 +238,16 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
 
   // --- OAuth 2.0 Protected Resource metadata & auth middleware ---
   if (oauthConfig) {
-    const resourceMetadataUrl = `${oauthConfig.mcpServerUrl.replace(/\/+$/, '')}/.well-known/oauth-protected-resource`;
-
-    const mcpBase = oauthConfig.mcpServerUrl.replace(/\/+$/, '');
+    // Helper: resolve the MCP server's public base URL for this request.
+    // Uses the static MCP_SERVER_URL override if set, otherwise derives from the request Host header.
+    const getMcpBase = (c: any): string => {
+      if (oauthConfig!.mcpServerUrl) {
+        return oauthConfig!.mcpServerUrl.replace(/\/+$/, '');
+      }
+      const proto = c.req.header('x-forwarded-proto') || 'https';
+      const host = c.req.header('host');
+      return `${proto}://${host}`;
+    };
 
     // Helper: resolve the auth server base URL for this request
     const getAuthServerBase = (c: any): string => {
@@ -253,8 +260,9 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
 
     // RFC 9728 — Protected Resource Metadata
     app.get('/.well-known/oauth-protected-resource', (c) => {
+      const mcpBase = getMcpBase(c);
       return c.json({
-        resource: oauthConfig.mcpServerUrl,
+        resource: mcpBase,
         authorization_servers: [mcpBase],
         scopes_supported: [],
         bearer_methods_supported: ['header'],
@@ -263,6 +271,7 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
 
     // RFC 8414 — Authorization Server Metadata
     app.get('/.well-known/oauth-authorization-server', (c) => {
+      const mcpBase = getMcpBase(c);
       const authServerBase = getAuthServerBase(c);
 
       return c.json({
@@ -315,6 +324,9 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
 
     // Bearer auth middleware for /mcp routes
     app.use('/mcp', async (c, next) => {
+      const mcpBase = getMcpBase(c);
+      const resourceMetadataUrl = `${mcpBase}/.well-known/oauth-protected-resource`;
+
       const authHeader = c.req.header('Authorization');
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return c.text('Unauthorized', 401, {
