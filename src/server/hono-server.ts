@@ -240,12 +240,18 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
   if (oauthConfig) {
     // Helper: resolve the MCP server's public base URL for this request.
     // Uses the static MCP_SERVER_URL override if set, otherwise derives from the request Host header.
+    // SECURITY: When mcpServerUrl is unset, Host and X-Forwarded-Proto are used from the request.
+    // Deploy behind a trusted reverse proxy (Railway, nginx, etc.) that sets these headers
+    // correctly — do NOT expose the container directly to the internet without one.
     const getMcpBase = (c: any): string => {
       if (oauthConfig!.mcpServerUrl) {
         return oauthConfig!.mcpServerUrl.replace(/\/+$/, '');
       }
-      const proto = c.req.header('x-forwarded-proto') || 'https';
       const host = c.req.header('host');
+      if (!host) {
+        throw new Error('Missing Host header — cannot derive MCP server URL. Set MCP_SERVER_URL or use a reverse proxy.');
+      }
+      const proto = c.req.header('x-forwarded-proto') || 'https';
       return `${proto}://${host}`;
     };
 
