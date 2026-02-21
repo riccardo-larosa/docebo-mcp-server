@@ -174,7 +174,41 @@ The server listens on port 3000 by default and exposes the MCP endpoint at `/mcp
 | `/.well-known/oauth-authorization-server` | GET | [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414) Authorization Server Metadata. Returns `issuer`, `authorization_endpoint`, `token_endpoint`, `grant_types_supported`, and `code_challenge_methods_supported`. |
 | `/oauth/token` | POST | Token proxy. Forwards the client's `grant_type`, `client_id`, `client_secret`, and `code` to the tenant's `/oauth2/token` endpoint and returns the response (access token + refresh token). |
 
-**OAuth flow summary:** MCP clients discover the server's auth configuration via the two `.well-known` endpoints, redirect the user to Docebo's `/oauth2/authorize` for consent, then exchange the authorization code through `/oauth/token`. The server never stores credentials — it proxies the token request to the correct tenant and the client uses the returned Bearer token on subsequent `/mcp` requests.
+#### OAuth Discovery & Authentication Flow
+
+The MCP server acts as both a **Protected Resource** (RFC 9728) and an **Authorization Server metadata host** (RFC 8414), proxying the actual OAuth exchange to Docebo. Here's how the two `.well-known` endpoints work together:
+
+```mermaid
+sequenceDiagram
+    participant C as MCP Client
+    participant S as MCP Server
+    participant D as Docebo (tenant)
+
+    Note over C,D: Step 1 — Discovery
+    C->>S: GET /.well-known/oauth-protected-resource
+    S-->>C: authorization_servers: ["https://mcp-server"]
+
+    C->>S: GET /.well-known/oauth-authorization-server
+    S-->>C: authorization_endpoint: "https://tenant.docebosaas.com/oauth2/authorize"<br/>token_endpoint: "https://mcp-server/oauth/token"
+
+    Note over C,D: Step 2 — User Authorization
+    C->>D: Redirect to /oauth2/authorize
+    D-->>C: Authorization code
+
+    Note over C,D: Step 3 — Token Exchange (proxied)
+    C->>S: POST /oauth/token (code + client_id + client_secret)
+    S->>D: POST /oauth2/token (forwarded)
+    D-->>S: access_token + refresh_token
+    S-->>C: Proxied token response
+
+    Note over C,D: Step 4 — Authenticated MCP Usage
+    C->>S: POST /mcp + Bearer access_token
+    S->>D: API calls with Bearer token
+    D-->>S: API response
+    S-->>C: MCP tool result
+```
+
+**Why `authorization_servers` points to the MCP server, not Docebo:** The `authorization_servers` field in the Protected Resource Metadata tells clients where to fetch the Authorization Server Metadata — not the actual authorization endpoint. Since the MCP server hosts the `/.well-known/oauth-authorization-server` endpoint (which contains the real Docebo URLs) and proxies token exchange through `/oauth/token`, it correctly advertises itself as the AS metadata host. The actual Docebo `authorization_endpoint` is revealed in step 2.
 
 ### Testing
 

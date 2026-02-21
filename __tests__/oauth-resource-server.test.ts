@@ -60,6 +60,25 @@ describe('OAuth Resource Server', () => {
       await next();
     });
 
+    // Service info endpoint
+    app.get('/info', (c) => {
+      return c.json({
+        server: 'docebo-mcp-server',
+        version: '0.3.0',
+        endpoints: {
+          mcp: `${MCP_SERVER_URL}/mcp`,
+          health: `${MCP_SERVER_URL}/health`,
+          oauth_protected_resource: `${MCP_SERVER_URL}/.well-known/oauth-protected-resource`,
+          oauth_authorization_server: `${MCP_SERVER_URL}/.well-known/oauth-authorization-server`,
+          token: `${MCP_SERVER_URL}/oauth/token`,
+        },
+        oauth: {
+          authorization_endpoint: `${AUTH_SERVER_URL}/oauth2/authorize`,
+          token_endpoint: `${MCP_SERVER_URL}/oauth/token`,
+        },
+      });
+    });
+
     // Simple MCP echo endpoint for testing authenticated access
     app.post('/mcp', (c) => {
       const token = c.get('bearerToken');
@@ -138,6 +157,51 @@ describe('OAuth Resource Server', () => {
 
     it('should not require auth for health endpoint', async () => {
       const res = await fetch(`${MCP_SERVER_URL}/health`);
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('Service Info Endpoint (/info)', () => {
+    it('should return server name and version', async () => {
+      const res = await fetch(`${MCP_SERVER_URL}/info`);
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.server).toBe('docebo-mcp-server');
+      expect(body.version).toBe('0.3.0');
+    });
+
+    it('should return JSON content type', async () => {
+      const res = await fetch(`${MCP_SERVER_URL}/info`);
+      expect(res.headers.get('content-type')).toContain('application/json');
+    });
+
+    it('should return all endpoint URLs', async () => {
+      const res = await fetch(`${MCP_SERVER_URL}/info`);
+      const body = await res.json();
+
+      expect(body.endpoints).toEqual({
+        mcp: `${MCP_SERVER_URL}/mcp`,
+        health: `${MCP_SERVER_URL}/health`,
+        oauth_protected_resource: `${MCP_SERVER_URL}/.well-known/oauth-protected-resource`,
+        oauth_authorization_server: `${MCP_SERVER_URL}/.well-known/oauth-authorization-server`,
+        token: `${MCP_SERVER_URL}/oauth/token`,
+      });
+    });
+
+    it('should return OAuth configuration with correct auth server', async () => {
+      const res = await fetch(`${MCP_SERVER_URL}/info`);
+      const body = await res.json();
+
+      expect(body.oauth).toEqual({
+        authorization_endpoint: `${AUTH_SERVER_URL}/oauth2/authorize`,
+        token_endpoint: `${MCP_SERVER_URL}/oauth/token`,
+      });
+    });
+
+    it('should not require authentication', async () => {
+      // No Authorization header — should still work
+      const res = await fetch(`${MCP_SERVER_URL}/info`);
       expect(res.status).toBe(200);
     });
   });
