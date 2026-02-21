@@ -165,10 +165,16 @@ The server listens on port 3000 by default and exposes the MCP endpoint at `/mcp
 
 #### HTTP API
 
-- **POST `/mcp`** — All MCP client requests (including `initialize`)
-- **GET `/health`** — Health check
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/mcp` | POST | All MCP client requests (initialize, tool calls, prompts). Sessions tracked via `mcp-session-id` header. |
+| `/health` | GET | Health check. Returns `{ status, server, version }`. |
+| `/info` | GET | Service info. Returns all endpoint URLs and OAuth configuration for the current tenant. |
+| `/.well-known/oauth-protected-resource` | GET | [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728) Protected Resource Metadata. Returns `resource`, `authorization_servers`, `scopes_supported`, and `bearer_methods_supported`. |
+| `/.well-known/oauth-authorization-server` | GET | [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414) Authorization Server Metadata. Returns `issuer`, `authorization_endpoint`, `token_endpoint`, `grant_types_supported`, and `code_challenge_methods_supported`. |
+| `/oauth/token` | POST | Token proxy. Forwards the client's `grant_type`, `client_id`, `client_secret`, and `code` to the tenant's `/oauth2/token` endpoint and returns the response (access token + refresh token). |
 
-Sessions are tracked via the `mcp-session-id` HTTP header.
+**OAuth flow summary:** MCP clients discover the server's auth configuration via the two `.well-known` endpoints, redirect the user to Docebo's `/oauth2/authorize` for consent, then exchange the authorization code through `/oauth/token`. The server never stores credentials — it proxies the token request to the correct tenant and the client uses the returned Bearer token on subsequent `/mcp` requests.
 
 ### Testing
 

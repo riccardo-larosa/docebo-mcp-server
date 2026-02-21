@@ -291,6 +291,27 @@ export async function setupStreamableHttpServer(serverFactory: () => Server, por
       });
     });
 
+    // Service info — exposes discovery URLs for debugging and operational visibility
+    app.get('/info', (c) => {
+      const mcpBase = getMcpBase(c);
+      const authServerBase = getAuthServerBase(c);
+      return c.json({
+        server: SERVER_NAME,
+        version: SERVER_VERSION,
+        endpoints: {
+          mcp: `${mcpBase}/mcp`,
+          health: `${mcpBase}/health`,
+          oauth_protected_resource: `${mcpBase}/.well-known/oauth-protected-resource`,
+          oauth_authorization_server: `${mcpBase}/.well-known/oauth-authorization-server`,
+          token: `${mcpBase}/oauth/token`,
+        },
+        oauth: {
+          authorization_endpoint: `${authServerBase}/oauth2/authorize`,
+          token_endpoint: `${mcpBase}/oauth/token`,
+        },
+      });
+    });
+
     // Token proxy — forwards client-provided credentials to the correct tenant's token endpoint
     app.post('/oauth/token', async (c) => {
       const start = Date.now();
